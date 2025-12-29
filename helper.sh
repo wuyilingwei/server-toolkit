@@ -1,6 +1,6 @@
 #!/bin/bash
-# Server Toolkit Configuration and Utility Functions
-# Version: 1.0.0
+# Server Toolkit Helper Functions
+# Version: 1.1.0
 
 # ===== 工作目录保护（强制要求） =====
 WORKDIR="/srv/server-toolkit"
@@ -15,7 +15,7 @@ if ! cd "$WORKDIR" 2>/dev/null; then
 fi
 # ====================================
 
-CONFIG_VERSION="1.0.0"
+CONFIG_VERSION="1.1.0"
 TOOLKIT_REPO="https://github.com/wuyilingwei/server-toolkit"
 RAW_REPO_URL="https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main"
 DEFAULT_INSTALL_DIR="/srv/server-toolkit"

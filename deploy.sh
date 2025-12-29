@@ -5,20 +5,10 @@
 
 set -e
 
-# ===== 工作目录保护（强制要求） =====
-WORKDIR="/srv/server-toolkit"
-# 确保工作目录存在
-mkdir -p "$WORKDIR"
-# 强制设置工作目录，如果失败则修改权限
-if ! cd "$WORKDIR" 2>/dev/null; then
-    # 如果无法进入，尝试修复权限
-    chmod 755 "$WORKDIR" 2>/dev/null || mkdir -p "$WORKDIR"
-    cd "$WORKDIR" || { echo "错误: 无法访问工作目录 $WORKDIR"; exit 1; }
-fi
-# ====================================
-
 # Configuration
 INSTALL_DIR="/srv/server-toolkit"
+SCRIPTS_DIR="$INSTALL_DIR/scripts"
+STORAGE_DIR="$INSTALL_DIR/storage"
 BIN_LINK="/usr/local/bin/server-toolkit"
 REPO_URL="https://github.com/wuyilingwei/server-toolkit"
 RAW_REPO_URL="https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main"
@@ -113,7 +103,7 @@ install_dependencies() {
     fi
     
     # Whitelist of allowed packages
-    local allowed_packages="curl jq procps"
+    local allowed_packages="curl jq procps git"
     local missing_pkgs=()
     
     # Check curl
@@ -129,6 +119,11 @@ install_dependencies() {
     # Check free (part of procps package)
     if ! command -v free &> /dev/null; then
         missing_pkgs+=(procps)
+    fi
+    
+    # Check git
+    if ! command -v git &> /dev/null; then
+        missing_pkgs+=(git)
     fi
     
     # Note: df is part of coreutils which is essential and should already be installed
@@ -171,32 +166,39 @@ if ! install_dependencies; then
     exit 1
 fi
 
-# 部署主模块到 /srv
-log_info "部署主模块到 $INSTALL_DIR"
+# 创建主目录
+log_info "创建主目录: $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 
-# 下载核心文件
-log_info "下载核心组件..."
-download_file() {
-    local file="$1"
-    local url="$RAW_REPO_URL/$file"
-    log_info "下载 $file..."
-    if curl -s -L -o "$INSTALL_DIR/$file" "$url"; then
-        return 0
-    else
-        log_error "下载 $file 失败"
-        return 1
-    fi
-}
+# 克隆或更新仓库到 scripts 目录
+log_info "克隆仓库到 $SCRIPTS_DIR"
 
-for file in "config.json" "config.sh" "menu.sh"; do
-    if ! download_file "$file"; then
-        log_error "核心组件下载失败，部署终止"
-        exit 1
-    fi
-done
+# 如果 scripts 目录已存在，强制删除并重新克隆
+if [ -d "$SCRIPTS_DIR" ]; then
+    log_warning "检测到已存在的 scripts 目录，将强制重新克隆"
+    rm -rf "$SCRIPTS_DIR"
+fi
 
-chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null
+# 克隆仓库
+if git clone "$REPO_URL" "$SCRIPTS_DIR"; then
+    log_success "仓库克隆成功"
+else
+    log_error "仓库克隆失败"
+    exit 1
+fi
+
+# 复制核心文件到主目录
+log_info "复制核心文件到主目录..."
+cp "$SCRIPTS_DIR/menu.sh" "$INSTALL_DIR/"
+cp "$SCRIPTS_DIR/config.json" "$INSTALL_DIR/"
+cp "$SCRIPTS_DIR/helper.sh" "$INSTALL_DIR/"
+
+chmod +x "$INSTALL_DIR/menu.sh"
+chmod +x "$INSTALL_DIR/helper.sh"
+
+# 创建 storage 目录
+log_info "创建持久化数据目录: $STORAGE_DIR"
+mkdir -p "$STORAGE_DIR"
 
 # 创建 server-toolkit 命令
 log_info "创建系统命令: server-toolkit"
@@ -249,8 +251,12 @@ echo -e "${COLOR_GREEN}==================================================${COLOR
 echo -e "${COLOR_GREEN}              部署完成！${COLOR_RESET}"
 echo -e "${COLOR_GREEN}==================================================${COLOR_RESET}"
 echo ""
-echo "主模块已部署到: $INSTALL_DIR"
-echo "子模块由主模块统一管理"
+echo "安装目录: $INSTALL_DIR"
+echo "  ├── menu.sh         (主菜单程序)"
+echo "  ├── config.json     (配置文件)"
+echo "  ├── helper.sh       (辅助函数)"
+echo "  ├── scripts/        (Git 仓库目录)"
+echo "  └── storage/        (持久化数据目录)"
 echo ""
 echo "使用以下命令启动工具包菜单："
 echo -e "  ${COLOR_CYAN}server-toolkit${COLOR_RESET}"
