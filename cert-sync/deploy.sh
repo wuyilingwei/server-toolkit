@@ -70,9 +70,11 @@ RESPONSE=$(curl -s -m 10 -X POST "$SYS_VAULT_URL" \
     -H "Authorization: Bearer $SYS_DEVICE_UUID" \
     -d '{"ops": [{"id": "list_certs", "type": "list", "module": "cert"}]}')
 
-# Check for errors
-if echo "$RESPONSE" | grep -q "error"; then
-    log_error "获取列表失败: $(echo "$RESPONSE" | jq -r '.error // .message // "未知错误"')"
+# Check for errors safely
+if ! echo "$RESPONSE" | jq -e '.[0].status == 200' >/dev/null 2>&1; then
+    ERR_MSG=$(echo "$RESPONSE" | jq -r 'if type=="array" then .[0].error // .[0].message else .error // .message end // "Unknown error"' 2>/dev/null)
+    log_error "获取列表失败: ${ERR_MSG:-Response format error}"
+    log_error "Response: $RESPONSE"
     exit 1
 fi
 
@@ -152,23 +154,28 @@ sync_domain() {
         return 1
     fi
     
-    local data=\$(echo "\$response" | jq -r '.[0].data // empty')
-    
-    if [ -z "\$data" ] || [ "\$data" = "null" ]; then
-        log "Error: No data found for \$domain"
+    # Check status
+    if ! echo "\$response" | jq -e '.[0].status == 200' >/dev/null 2>&1; then
+        log "Error: API returned error for \$domain"
         return 1
     fi
     
     mkdir -p "\$cert_dir"
     
-    # Extract Standard Certs
-    echo "\$data" | jq -r '.cert // empty' > "\$cert_dir/cert.pem"
-    echo "\$data" | jq -r '.fullchain // empty' > "\$cert_dir/fullchain.pem"
-    echo "\$data" | jq -r '.privkey // empty' > "\$cert_dir/privkey.pem"
+    # Helper to format cert (handle literal \n and ensure proper line breaks)
+    # Uses awk to replace literal '\n' sequences with actual newlines
+    format_cert() {
+        awk '{gsub(/\\\\n/,"\n"); print}'
+    }
+    
+    # Extract Standard Certs (Parse from data array)
+    echo "\$response" | jq -r '.[0].data[] | select(.key | endswith("-cert")) | .value // empty' | format_cert > "\$cert_dir/cert.pem"
+    echo "\$response" | jq -r '.[0].data[] | select(.key | endswith("-fullchain")) | .value // empty' | format_cert > "\$cert_dir/fullchain.pem"
+    echo "\$response" | jq -r '.[0].data[] | select(.key | endswith("-privkey")) | .value // empty' | format_cert > "\$cert_dir/privkey.pem"
     
     # Extract CF Origin Certs
-    echo "\$data" | jq -r '.cf_public // empty' > "\$cert_dir/cf-public.pem"
-    echo "\$data" | jq -r '.cf_private // empty' > "\$cert_dir/cf-private.pem"
+    echo "\$response" | jq -r '.[0].data[] | select(.key | endswith("-cf-public")) | .value // empty' | format_cert > "\$cert_dir/cf-public.pem"
+    echo "\$response" | jq -r '.[0].data[] | select(.key | endswith("-cf-private")) | .value // empty' | format_cert > "\$cert_dir/cf-private.pem"
     
     # Cleanup empty files
     find "\$cert_dir" -type f -empty -delete

@@ -12,21 +12,21 @@
       "enabled": true
     },
     {
-      "id": "system-swap",
-      "name": "系统 Swap 管理",
-      "description": "创建、调整 Swap 交换区及 Swappiness 设置",
-      "script": "system/swap.sh",
-      "min_config_version": "1.0.0",
-      "menu_id": 12,
-      "enabled": true
-    },
-    {
       "id": "cert-sync",
       "name": "证书同步管理",
       "description": "从 Vault 同步 SSL 证书 (Standard/CF Origin)",
       "script": "cert-sync/deploy.sh",
       "min_config_version": "1.0.0",
       "menu_id": 11,
+      "enabled": true
+    },
+    {
+      "id": "system-swap",
+      "name": "系统 Swap 管理",
+      "description": "创建、调整 Swap 交换区及 Swappiness 设置",
+      "script": "system/swap.sh",
+      "min_config_version": "1.0.0",
+      "menu_id": 12,
       "enabled": true
     }
   ],
