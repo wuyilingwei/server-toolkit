@@ -9,7 +9,7 @@ set -e
 INSTALL_DIR="/srv/server-toolkit"
 BIN_LINK="/usr/local/bin/server-toolkit"
 REPO_URL="https://github.com/wuyilingwei/server-toolkit"
-TEMP_DIR="/tmp/server-toolkit-$$"
+TEMP_DIR=$(mktemp -d -t server-toolkit.XXXXXXXXXX)
 DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
 
 # Color codes
@@ -99,6 +99,8 @@ install_dependencies() {
         return 1
     fi
     
+    # Whitelist of allowed packages
+    local allowed_packages="curl jq git procps"
     local missing_pkgs=()
     
     # Check curl
@@ -124,6 +126,14 @@ install_dependencies() {
     # Note: df is part of coreutils which is essential and should already be installed
     
     if [ ${#missing_pkgs[@]} -ne 0 ]; then
+        # Validate all packages are in whitelist
+        for pkg in "${missing_pkgs[@]}"; do
+            if [[ ! " $allowed_packages " =~ " $pkg " ]]; then
+                log_error "不允许安装的软件包: $pkg"
+                return 1
+            fi
+        done
+        
         log_warning "缺少以下软件包: ${missing_pkgs[*]}"
         log_info "正在自动安装依赖..."
         
@@ -133,8 +143,8 @@ install_dependencies() {
             return 1
         }
         
-        # Install missing packages
-        apt-get install -y -qq ${missing_pkgs[*]} || {
+        # Install missing packages (validated against whitelist)
+        apt-get install -y -qq "${missing_pkgs[@]}" || {
             log_error "依赖安装失败"
             return 1
         }
