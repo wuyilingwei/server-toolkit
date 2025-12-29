@@ -265,6 +265,9 @@ write_installed_config() {
     local install_dir=$(get_install_dir)
     local installed_file="$install_dir/installed.json"
     
+    # 确保目录存在
+    mkdir -p "$install_dir"
+    
     echo "$content" > "$installed_file"
 }
 
