@@ -68,7 +68,7 @@ log_info "正在获取授权的证书列表..."
 RESPONSE=$(curl -s -m 10 -X POST "$SYS_VAULT_URL" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $SYS_DEVICE_UUID" \
-    -d '{"ops": [{"id": "list_certs", "type": "list", "module": "cert"}]}')
+    -d '{"ops": [{"id": "list_certs", "type": "list", "module": "certs"}]}')
 
 # Check for errors safely
 if ! echo "$RESPONSE" | jq -e '.[0].status == 200' >/dev/null 2>&1; then
@@ -142,7 +142,7 @@ sync_domain() {
     log "Syncing \$domain..."
     
     # Fetch cert data
-    local payload="{\"ops\": [{\"id\": \"get_cert\", \"type\": \"read\", \"module\": \"cert\", \"key\": \"\$domain\"}]}"
+    local payload="{\"ops\": [{\"id\": \"get_cert\", \"type\": \"read\", \"module\": \"certs\", \"key\": \"\$domain\"}]}"
     local response=\$(curl -s -m 30 -X POST "\$VAULT_URL" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer \$TOKEN" \
