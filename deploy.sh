@@ -5,6 +5,18 @@
 
 set -e
 
+# ===== 工作目录保护（强制要求） =====
+WORKDIR="/srv/server-toolkit"
+# 确保工作目录存在
+mkdir -p "$WORKDIR"
+# 强制设置工作目录，如果失败则修改权限
+if ! cd "$WORKDIR" 2>/dev/null; then
+    # 如果无法进入，尝试修复权限
+    chmod 755 "$WORKDIR" 2>/dev/null || mkdir -p "$WORKDIR"
+    cd "$WORKDIR" || { echo "错误: 无法访问工作目录 $WORKDIR"; exit 1; }
+fi
+# ====================================
+
 # Configuration
 INSTALL_DIR="/srv/server-toolkit"
 BIN_LINK="/usr/local/bin/server-toolkit"

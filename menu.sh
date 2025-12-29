@@ -2,6 +2,18 @@
 # Server Toolkit Interactive Menu
 # This is the main interface that runs from /srv/server-toolkit
 
+# ===== 工作目录保护（强制要求） =====
+WORKDIR="/srv/server-toolkit"
+# 确保工作目录存在
+mkdir -p "$WORKDIR"
+# 强制设置工作目录，如果失败则修改权限
+if ! cd "$WORKDIR" 2>/dev/null; then
+    # 如果无法进入，尝试修复权限
+    chmod 755 "$WORKDIR" 2>/dev/null || mkdir -p "$WORKDIR"
+    cd "$WORKDIR" || { echo "错误: 无法访问工作目录 $WORKDIR"; exit 1; }
+fi
+# ====================================
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source config
@@ -194,8 +206,19 @@ execute_module() {
     log_info "正在从远程执行: $script_path"
     echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
     
-    # 直接从远程执行脚本，添加超时保护
-    curl -s -L -m 300 "$script_url" | bash
+    # 直接从远程执行脚本，添加超时保护和工作目录保护
+    # 为脚本注入工作目录检查代码
+    curl -s -L -m 300 "$script_url" | bash -c "
+        # 工作目录保护
+        WORKDIR='/srv/server-toolkit'
+        mkdir -p \"\$WORKDIR\"
+        if ! cd \"\$WORKDIR\" 2>/dev/null; then
+            chmod 755 \"\$WORKDIR\" 2>/dev/null || mkdir -p \"\$WORKDIR\"
+            cd \"\$WORKDIR\" || { echo '[错误] 无法访问工作目录'; exit 1; }
+        fi
+        # 执行远程脚本
+        bash
+    "
     local exit_code=$?
     
     echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
