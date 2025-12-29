@@ -195,28 +195,24 @@ execute_module() {
     echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
     
     # 直接从远程执行脚本
-    if curl -s -L "$script_url" | bash; then
-        local exit_code=$?
-        echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
+    curl -s -L "$script_url" | bash
+    local exit_code=$?
+    
+    echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
+    
+    if [ $exit_code -eq 0 ]; then
+        log_success "脚本执行完成"
         
-        if [ $exit_code -eq 0 ]; then
-            log_success "脚本执行完成"
-            
-            # 如果模块需要持久化，记录安装
-            if [ "$needs_persistence" = "true" ]; then
-                register_module_install "$module_id" "$module_version"
-                log_success "模块已记录为已安装: $module_id v$module_version"
-            fi
-        else
-            log_warning "脚本退出码: $exit_code"
+        # 如果模块需要持久化，记录安装
+        if [ "$needs_persistence" = "true" ]; then
+            register_module_install "$module_id" "$module_version"
+            log_success "模块已记录为已安装: $module_id v$module_version"
         fi
-        
-        return $exit_code
     else
-        echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
-        log_error "无法获取或执行远程脚本: $script_url"
-        return 1
+        log_warning "脚本退出码: $exit_code"
     fi
+    
+    return $exit_code
 }
 
 # 显示菜单

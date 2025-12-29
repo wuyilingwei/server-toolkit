@@ -286,10 +286,11 @@ register_module_install() {
     local installed=$(read_installed_config)
     
     # 移除旧记录
-    installed=$(echo "$installed" | jq "del(.modules[] | select(.id == \"$module_id\"))")
+    installed=$(echo "$installed" | jq --arg id "$module_id" 'del(.modules[] | select(.id == $id))')
     
-    # 添加新记录
-    installed=$(echo "$installed" | jq ".modules += [{\"id\": \"$module_id\", \"version\": \"$version\", \"installed_at\": \"$(date -Iseconds)\"}]")
+    # 添加新记录 - 使用 jq 参数避免 JSON 注入
+    installed=$(echo "$installed" | jq --arg id "$module_id" --arg ver "$version" --arg ts "$(date -Iseconds)" \
+        '.modules += [{"id": $id, "version": $ver, "installed_at": $ts}]')
     
     write_installed_config "$installed"
 }
