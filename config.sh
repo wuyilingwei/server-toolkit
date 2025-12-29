@@ -20,7 +20,7 @@ COLOR_CYAN="\033[1;36m"
 check_dependencies() {
     local missing_deps=()
     
-    for cmd in curl jq free df git; do
+    for cmd in curl jq free df; do
         if ! command -v $cmd &> /dev/null; then
             missing_deps+=($cmd)
         fi

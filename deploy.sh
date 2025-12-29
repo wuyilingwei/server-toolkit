@@ -190,7 +190,6 @@ chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null
 log_info "创建系统命令: server-toolkit"
 cat > "$BIN_LINK" << EOF
 #!/bin/bash
-cd "$INSTALL_DIR"
 bash "$INSTALL_DIR/menu.sh" "\$@"
 EOF
 chmod +x "$BIN_LINK"
