@@ -278,8 +278,8 @@ get_installed_version() {
     
     local version=$(echo "$installed" | jq -r --arg id "$module_id" '.modules[] | select(.id == $id) | .version')
     
-    # 如果版本为空，返回"未安装"
-    if [ -z "$version" ]; then
+    # 如果版本为空或null，返回"未安装"
+    if [ -z "$version" ] || [ "$version" = "null" ]; then
         echo "未安装"
     else
         echo "$version"
@@ -290,13 +290,14 @@ get_installed_version() {
 register_module_install() {
     local module_id="$1"
     local version="$2"
+    local timestamp="$(date -Iseconds)"
     local installed=$(read_installed_config)
     
     # 移除旧记录
     installed=$(echo "$installed" | jq --arg id "$module_id" 'del(.modules[] | select(.id == $id))')
     
     # 添加新记录 - 使用 jq 参数避免 JSON 注入
-    installed=$(echo "$installed" | jq --arg id "$module_id" --arg ver "$version" --arg ts "$(date -Iseconds)" \
+    installed=$(echo "$installed" | jq --arg id "$module_id" --arg ver "$version" --arg ts "$timestamp" \
         '.modules += [{"id": $id, "version": $ver, "installed_at": $ts}]')
     
     write_installed_config "$installed"

@@ -132,14 +132,14 @@ update_modules() {
     
     # 显示已安装的持久化模块
     local installed=$(read_installed_config)
-    local installed_modules=$(echo "$installed" | jq -r '.modules[]? | "\(.id) v\(.version)"' 2>/dev/null)
+    local installed_modules=$(echo "$installed" | jq -r '.modules[]? | "\(.id | @sh) v\(.version | @sh)"' 2>/dev/null)
     
     if [ -n "$installed_modules" ]; then
         echo ""
         echo -e "${COLOR_GREEN}已安装的持久化模块:${COLOR_RESET}"
-        echo "$installed_modules" | while read -r line; do
+        while IFS= read -r line; do
             echo "  - $line"
-        done
+        done <<< "$installed_modules"
         echo ""
         log_info "重新执行对应菜单选项即可更新这些模块"
     else
