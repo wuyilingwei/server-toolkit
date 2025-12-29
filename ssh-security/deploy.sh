@@ -92,7 +92,7 @@ IPS=\$(echo "\$RESPONSE" | jq -r ".[0].data.content" 2>/dev/null | tr " ," "\\n"
 
 # 3. [熔断逻辑] 如果 IPS 长度为 0 或解析失败
 if [ -z "\$IPS" ]; then
-    echo "[$(date)]" 警告: 同步失败或白名单为空。为防止锁死，已撤回 DROP 拦截。"
+    echo "[$(date)] 警告: 同步失败或白名单为空。为防止锁死，已撤回 DROP 拦截。"
     cleanup_drop
     exit 1
 fi
