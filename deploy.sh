@@ -158,12 +158,7 @@ if ! install_dependencies; then
     exit 1
 fi
 
-# Clone main module from remote repository
-log_info "从远程仓库拉取主模块..."
-
-# Clone repository to temp directory (mktemp already created it)
-if git clone --quiet --depth 1 "$REPO_URL" "$TEMP_DIR"; then
-  部署主模块到 /srv
+# 部署主模块到 /srv
 log_info "部署主模块到 $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 
@@ -188,7 +183,12 @@ for file in "config.json" "config.sh" "menu.sh"; do
     fi
 done
 
-chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null/bin/bash
+chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null
+
+# 创建 server-toolkit 命令
+log_info "创建系统命令: server-toolkit"
+cat > "$BIN_LINK" << EOF
+#!/bin/bash
 cd "$INSTALL_DIR"
 bash "$INSTALL_DIR/menu.sh" "\$@"
 EOF
@@ -243,8 +243,3 @@ echo ""
 echo "使用以下命令启动工具包菜单："
 echo -e "  ${COLOR_CYAN}server-toolkit${COLOR_RESET}"
 echo ""
-
-# Clean up temp directory
-log_info "清理临时文件..."
-rm -rf "$TEMP_DIR" 2>/dev/null || true
-log_success "临时文件已清理"
