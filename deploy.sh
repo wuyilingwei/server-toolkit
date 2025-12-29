@@ -76,8 +76,9 @@ get_vault_url() {
     get_config_value "SYS_VAULT_URL" "$DEFAULT_VAULT_URL"
 }
 
-echo ""
-echo -e "${COLOR_CYAN}==================================================${COLOR_RESET}"
+main() {
+    echo ""
+    echo -e "${COLOR_CYAN}==================================================${COLOR_RESET}"
 echo -e "${COLOR_BLUE}    Server Toolkit 远程部署脚本${COLOR_RESET}"
 echo -e "${COLOR_CYAN}==================================================${COLOR_RESET}"
 echo ""
@@ -242,4 +243,7 @@ echo "子模块由主模块统一管理"
 echo ""
 echo "使用以下命令启动工具包菜单："
 echo -e "  ${COLOR_CYAN}server-toolkit${COLOR_RESET}"
-echo ""
+    echo ""
+}
+
+main "$@"
