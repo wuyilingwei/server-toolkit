@@ -9,7 +9,9 @@
       "script": "ssh-security/deploy.sh",
       "min_config_version": "1.0.0",
       "menu_id": 10,
-      "enabled": true
+      "enabled": true,
+      "needs_persistence": true,
+      "version": "1.0.0"
     },
     {
       "id": "cert-sync",
@@ -18,7 +20,9 @@
       "script": "cert-sync/deploy.sh",
       "min_config_version": "1.0.0",
       "menu_id": 11,
-      "enabled": true
+      "enabled": true,
+      "needs_persistence": true,
+      "version": "1.0.0"
     },
     {
       "id": "system-swap",
@@ -27,7 +31,9 @@
       "script": "system/swap.sh",
       "min_config_version": "1.0.0",
       "menu_id": 12,
-      "enabled": true
+      "enabled": true,
+      "needs_persistence": false,
+      "version": "1.0.0"
     }
   ],
   "reserved_menu": {

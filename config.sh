@@ -247,6 +247,74 @@ show_system_info() {
     echo ""
 }
 
+# 读取已安装模块配置
+read_installed_config() {
+    local install_dir=$(get_install_dir)
+    local installed_file="$install_dir/installed.json"
+    
+    if [ -f "$installed_file" ]; then
+        cat "$installed_file"
+    else
+        echo '{"modules":[]}'
+    fi
+}
+
+# 保存已安装模块配置
+write_installed_config() {
+    local content="$1"
+    local install_dir=$(get_install_dir)
+    local installed_file="$install_dir/installed.json"
+    
+    # 确保目录存在
+    mkdir -p "$install_dir"
+    
+    echo "$content" > "$installed_file"
+}
+
+# 获取已安装模块的版本
+get_installed_version() {
+    local module_id="$1"
+    local installed=$(read_installed_config)
+    
+    local version=$(echo "$installed" | jq -r --arg id "$module_id" '.modules[] | select(.id == $id) | .version')
+    
+    # 如果版本为空或null，返回"未安装"
+    if [ -z "$version" ] || [ "$version" = "null" ]; then
+        echo "未安装"
+    else
+        echo "$version"
+    fi
+}
+
+# 记录模块安装
+register_module_install() {
+    local module_id="$1"
+    local version="$2"
+    local timestamp="$(date -Iseconds)"
+    local installed=$(read_installed_config)
+    
+    # 移除旧记录
+    installed=$(echo "$installed" | jq --arg id "$module_id" 'del(.modules[] | select(.id == $id))')
+    
+    # 添加新记录 - 使用 jq 参数避免 JSON 注入
+    installed=$(echo "$installed" | jq --arg id "$module_id" --arg ver "$version" --arg ts "$timestamp" \
+        '.modules += [{"id": $id, "version": $ver, "installed_at": $ts}]')
+    
+    write_installed_config "$installed"
+}
+
+# 检查模块是否已安装
+is_module_installed() {
+    local module_id="$1"
+    local version=$(get_installed_version "$module_id")
+    
+    if [ "$version" != "未安装" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # 日志函数
 log_info() {
     echo -e "${COLOR_BLUE}[INFO]${COLOR_RESET} $1"

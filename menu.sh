@@ -127,37 +127,26 @@ update_modules() {
     echo ""
     echo -e "${COLOR_CYAN}==================== 更新模块 ====================${COLOR_RESET}"
     
-    local install_dir=$(get_install_dir)
-    local config=$(read_repo_config)
-    local modules=$(echo "$config" | jq -c '.modules[]?' 2>/dev/null)
-    local updated_count=0
+    log_info "模块现在通过远程执行，无需手动更新"
+    log_info "已安装的持久化模块会在重新执行时自动更新"
     
-    if [ -n "$modules" ]; then
-        echo "$modules" | while IFS= read -r module; do
-            local script=$(echo "$module" | jq -r '.script')
-            local name=$(echo "$module" | jq -r '.name')
-            local full_path="$install_dir/$script"
-            
-            # 仅更新已安装（文件存在）的模块
-            if [ -f "$full_path" ]; then
-                log_info "正在更新: $name ($script)..."
-                if download_from_repo "$script" "$full_path"; then
-                    chmod +x "$full_path"
-                    log_success "更新完成"
-                    updated_count=$((updated_count + 1))
-                else
-                    log_error "更新失败"
-                fi
-            fi
-        done
-    fi
+    # 显示已安装的持久化模块
+    local installed=$(read_installed_config)
+    local installed_modules=$(echo "$installed" | jq -r '.modules[]? | "\(.id | @sh) v\(.version | @sh)"' 2>/dev/null)
     
-    if [ "$updated_count" -eq 0 ]; then
-        log_info "没有发现已安装的模块，或无需更新"
+    if [ -n "$installed_modules" ]; then
+        echo ""
+        echo -e "${COLOR_GREEN}已安装的持久化模块:${COLOR_RESET}"
+        while IFS= read -r line; do
+            echo "  - $line"
+        done <<< "$installed_modules"
+        echo ""
+        log_info "重新执行对应菜单选项即可更新这些模块"
     else
         echo ""
-        log_success "所有已安装模块更新完毕"
+        log_info "当前没有已安装的持久化模块"
     fi
+    
     echo ""
 }
 
@@ -173,22 +162,19 @@ show_current_config() {
     echo "  SYS_TOOLKIT_REPO: $(get_remote_repo)"
     echo ""
     
-    echo -e "${COLOR_GREEN}已安装模块:${COLOR_RESET}"
-    local config=$(read_local_config)
-    local modules=$(echo "$config" | jq -r '.modules[]?.id // empty' 2>/dev/null)
+    echo -e "${COLOR_GREEN}已安装的持久化模块:${COLOR_RESET}"
+    local installed=$(read_installed_config)
+    local installed_modules=$(echo "$installed" | jq -r '.modules[]?' 2>/dev/null)
     
-    if [ -z "$modules" ]; then
-        # 从仓库配置读取
-        config=$(read_repo_config)
-        modules=$(echo "$config" | jq -r '.modules[]?.id // empty' 2>/dev/null)
-    fi
-    
-    if [ -n "$modules" ]; then
-        echo "$modules" | while read module; do
-            echo "  - $module"
+    if [ -n "$installed_modules" ]; then
+        echo "$installed_modules" | while IFS= read -r module; do
+            local id=$(echo "$module" | jq -r '.id')
+            local version=$(echo "$module" | jq -r '.version')
+            local installed_at=$(echo "$module" | jq -r '.installed_at // "未知时间"')
+            echo "  - $id (v$version) - 安装于 $installed_at"
         done
     else
-        echo "  (无已安装模块)"
+        echo "  (无已安装的持久化模块)"
     fi
     echo ""
 }
@@ -196,37 +182,32 @@ show_current_config() {
 # 执行模块脚本
 execute_module() {
     local script_path="$1"
+    local module_id="$2"
+    local module_version="$3"
+    local needs_persistence="$4"
     local install_dir=$(get_install_dir)
-    local full_path="$install_dir/$script_path"
     
-    # 检查并自动下载模块
-    if [ ! -f "$full_path" ]; then
-        log_info "模块尚未安装，正在下载..."
-        if download_from_repo "$script_path" "$full_path"; then
-            chmod +x "$full_path"
-            log_success "模块下载完成"
-        else
-            log_error "模块下载失败: $script_path"
-            return 1
-        fi
-    fi
-    
-    if [ ! -x "$full_path" ]; then
-        chmod +x "$full_path"
-    fi
+    # 构建远程 URL
+    local script_url="$RAW_REPO_URL/$script_path"
     
     echo ""
-    log_info "正在执行: $script_path"
+    log_info "正在从远程执行: $script_path"
     echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
     
-    # 执行脚本
-    bash "$full_path"
+    # 直接从远程执行脚本，添加超时保护
+    curl -s -L -m 300 "$script_url" | bash
     local exit_code=$?
     
     echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
     
     if [ $exit_code -eq 0 ]; then
         log_success "脚本执行完成"
+        
+        # 如果模块需要持久化，记录安装
+        if [ "$needs_persistence" = "true" ]; then
+            register_module_install "$module_id" "$module_version"
+            log_success "模块已记录为已安装: $module_id v$module_version"
+        fi
     else
         log_warning "脚本退出码: $exit_code"
     fi
@@ -257,9 +238,30 @@ show_menu() {
             local id=$(echo "$module" | jq -r '.menu_id')
             local name=$(echo "$module" | jq -r '.name')
             local enabled=$(echo "$module" | jq -r '.enabled')
+            local module_id=$(echo "$module" | jq -r '.id')
+            local module_version=$(echo "$module" | jq -r '.version // "1.0.0"')
+            local needs_persistence=$(echo "$module" | jq -r '.needs_persistence // false')
             
             if [ "$enabled" = "true" ]; then
-                echo -e "${COLOR_YELLOW}[$id]${COLOR_RESET} $name"
+                local status_text=""
+                
+                # 检查是否需要持久化
+                if [ "$needs_persistence" = "true" ]; then
+                    local installed_version=$(get_installed_version "$module_id")
+                    
+                    if [ "$installed_version" != "未安装" ]; then
+                        status_text=" ${COLOR_GREEN}[已安装 v$installed_version]${COLOR_RESET}"
+                        
+                        # 检查是否有更新
+                        if [ "$installed_version" != "$module_version" ]; then
+                            status_text="$status_text ${COLOR_YELLOW}[可更新到 v$module_version]${COLOR_RESET}"
+                        fi
+                    else
+                        status_text=" ${COLOR_YELLOW}[未安装]${COLOR_RESET}"
+                    fi
+                fi
+                
+                echo -e "${COLOR_YELLOW}[$id]${COLOR_RESET} $name$status_text"
             fi
         done
     fi
@@ -344,6 +346,9 @@ main_loop() {
                         local script=$(echo "$module" | jq -r '.script')
                         local name=$(echo "$module" | jq -r '.name')
                         local min_config=$(echo "$module" | jq -r '.min_config_version // "1.0.0"')
+                        local module_id=$(echo "$module" | jq -r '.id')
+                        local module_version=$(echo "$module" | jq -r '.version // "1.0.0"')
+                        local needs_persistence=$(echo "$module" | jq -r '.needs_persistence // false')
                         
                         # 检查版本兼容性
                         if ! version_ge "$CONFIG_VERSION" "$min_config"; then
@@ -353,7 +358,7 @@ main_loop() {
                             continue
                         fi
                         
-                        execute_module "$script"
+                        execute_module "$script" "$module_id" "$module_version" "$needs_persistence"
                     else
                         log_error "无效的操作编号"
                     fi
