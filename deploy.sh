@@ -64,8 +64,8 @@ set_config_value() {
     # 添加新值
     echo "${key}=\"${value}\"" >> /etc/environment
     
-    # 导出到当前环境
-    export ${key}="${value}"
+    # 导出到当前环境 (safely quoted)
+    export "${key}=${value}"
 }
 
 get_device_uuid() {
@@ -166,10 +166,7 @@ fi
 # Clone main module from remote repository
 log_info "从远程仓库拉取主模块..."
 
-# Clean up temp directory if exists
-rm -rf "$TEMP_DIR" 2>/dev/null || true
-
-# Clone repository
+# Clone repository to temp directory (mktemp already created it)
 if git clone --quiet --depth 1 "$REPO_URL" "$TEMP_DIR"; then
     log_success "主模块拉取完成"
 else
@@ -182,9 +179,9 @@ fi
 log_info "部署主模块到 $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 
-# 复制主模块文件
+# 复制主模块文件 (including hidden files)
 log_info "复制主模块文件..."
-cp -r "$TEMP_DIR"/* "$INSTALL_DIR/" 2>/dev/null || true
+cp -r "$TEMP_DIR/." "$INSTALL_DIR/" 2>/dev/null || true
 chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null || true
 chmod +x "$INSTALL_DIR"/*/*.sh 2>/dev/null || true
 
