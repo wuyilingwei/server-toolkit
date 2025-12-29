@@ -1,0 +1,26 @@
+# Log files
+*.log
+/var/log/
+
+# Temporary files
+*.tmp
+/tmp/
+.tmp/
+
+# Backup files
+*.bak
+*~
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+test_*.sh
