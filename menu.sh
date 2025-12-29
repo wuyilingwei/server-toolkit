@@ -44,13 +44,30 @@ do_self_update() {
     fi
     
     log_info "拉取最新代码..."
-    if git pull origin "$default_branch" 2>/dev/null; then
+    if git pull origin "$default_branch"; then
         log_success "更新成功！"
         log_info "重新加载配置..."
         source "$install_dir/config.sh"
         return 0
     else
         log_error "更新失败"
+        echo -e "${COLOR_YELLOW}可能是因为本地文件有修改导致冲突。${COLOR_RESET}"
+        echo -n "是否强制更新 (将丢弃本地修改)? (y/n): "
+        read force_update
+        
+        if [ "$force_update" = "y" ] || [ "$force_update" = "Y" ]; then
+            log_info "正在强制更新..."
+            git fetch origin
+            if git reset --hard "origin/$default_branch"; then
+                log_success "强制更新成功！"
+                log_info "重新加载配置..."
+                source "$install_dir/config.sh"
+                return 0
+            else
+                log_error "强制更新失败"
+                return 1
+            fi
+        fi
         return 1
     fi
 }
