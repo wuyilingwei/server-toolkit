@@ -12,12 +12,12 @@
       "enabled": true
     },
     {
-      "id": "system-update",
-      "name": "系统更新",
-      "description": "自动化系统更新和维护",
-      "script": "system/update.sh",
+      "id": "system-swap",
+      "name": "系统 Swap 管理",
+      "description": "创建、调整 Swap 交换区及 Swappiness 设置",
+      "script": "system/swap.sh",
       "min_config_version": "1.0.0",
-      "menu_id": 11,
+      "menu_id": 12,
       "enabled": true
     }
   ],
