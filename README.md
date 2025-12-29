@@ -38,14 +38,31 @@ server-toolkit/
 
 ## 快速开始
 
-### 1. 安装依赖
+### 方法一：一键远程部署（推荐）
+
+无需手动克隆仓库或安装依赖，直接运行：
 
 ```bash
-sudo apt update
-sudo apt install -y curl jq git
+curl -sSL https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/deploy.sh | sudo bash
 ```
 
-### 2. 部署工具包
+或使用 wget：
+
+```bash
+wget -qO- https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/deploy.sh | sudo bash
+```
+
+部署脚本会自动：
+- 检测并安装缺失的系统依赖（curl、jq、git 等）
+- 从远程仓库克隆工具包
+- 将工具包安装到 `/srv/server-toolkit/`
+- 创建 `server-toolkit` 系统命令
+- 配置环境变量（Vault URL、设备 UUID 等）
+- 初始化 Git 仓库用于自动更新
+
+### 方法二：本地部署
+
+如果你想先查看代码再部署，可以手动克隆：
 
 ```bash
 # 克隆仓库
@@ -62,7 +79,7 @@ sudo bash deploy.sh
 - 配置环境变量（Vault URL、设备 UUID 等）
 - 初始化 Git 仓库用于自动更新
 
-### 3. 启动工具包
+### 启动工具包
 
 部署完成后，使用以下命令启动：
 

@@ -1,18 +1,61 @@
 #!/bin/bash
 # Server Toolkit Deployment Script
 # This script installs the toolkit to /srv/server-toolkit
+# Can be run locally or directly from remote URL
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Configuration
 INSTALL_DIR="/srv/server-toolkit"
 BIN_LINK="/usr/local/bin/server-toolkit"
+REPO_URL="https://github.com/wuyilingwei/server-toolkit"
+TEMP_DIR="/tmp/server-toolkit-$$"
 
-# Source config
-source "$SCRIPT_DIR/config.sh"
+# Color codes (inline for remote execution)
+COLOR_RESET="\033[0m"
+COLOR_BLUE="\033[1;34m"
+COLOR_GREEN="\033[1;32m"
+COLOR_YELLOW="\033[1;33m"
+COLOR_RED="\033[1;31m"
+COLOR_CYAN="\033[1;36m"
 
+# Simple logging functions
+log_info() {
+    echo -e "${COLOR_BLUE}[INFO]${COLOR_RESET} $1"
+}
+
+log_success() {
+    echo -e "${COLOR_GREEN}[成功]${COLOR_RESET} $1"
+}
+
+log_warning() {
+    echo -e "${COLOR_YELLOW}[警告]${COLOR_RESET} $1"
+}
+
+log_error() {
+    echo -e "${COLOR_RED}[错误]${COLOR_RESET} $1"
+}
+
+# Detect if running from remote (piped input) or local
+SCRIPT_DIR=""
+if [ -n "${BASH_SOURCE[0]}" ] && [ "${BASH_SOURCE[0]}" != "bash" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
+# Check if we have a valid script directory with config.sh
+if [ -z "$SCRIPT_DIR" ] || [ ! -f "$SCRIPT_DIR/config.sh" ]; then
+    REMOTE_MODE=true
+    log_info "检测到远程执行模式"
+else
+    REMOTE_MODE=false
+    log_info "检测到本地执行模式"
+    # Source config only if in local mode
+    source "$SCRIPT_DIR/config.sh"
+fi
+
+echo ""
 echo -e "${COLOR_CYAN}==================================================${COLOR_RESET}"
-echo -e "${COLOR_BLUE}    Server Toolkit 部署脚本 v${CONFIG_VERSION}${COLOR_RESET}"
+echo -e "${COLOR_BLUE}    Server Toolkit 部署脚本${COLOR_RESET}"
 echo -e "${COLOR_CYAN}==================================================${COLOR_RESET}"
 echo ""
 
@@ -20,15 +63,77 @@ echo ""
 if [ "$EUID" -ne 0 ]; then 
     log_error "此脚本需要 root 权限运行"
     echo "请使用: sudo bash deploy.sh"
+    echo "或远程执行: curl -sSL https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/deploy.sh | sudo bash"
     exit 1
 fi
 
-# 检查依赖
-log_info "检查系统依赖..."
-if ! check_dependencies; then
+# Install dependencies automatically
+install_dependencies() {
+    log_info "检查并安装系统依赖..."
+    
+    local missing_deps=()
+    for cmd in curl jq git free df; do
+        if ! command -v $cmd &> /dev/null; then
+            missing_deps+=($cmd)
+        fi
+    done
+    
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        log_warning "缺少以下依赖: ${missing_deps[*]}"
+        log_info "正在自动安装依赖..."
+        
+        # Update package list
+        apt-get update -qq || {
+            log_error "无法更新软件包列表"
+            return 1
+        }
+        
+        # Install missing dependencies
+        apt-get install -y -qq ${missing_deps[*]} || {
+            log_error "依赖安装失败"
+            return 1
+        }
+        
+        log_success "依赖安装完成"
+    else
+        log_success "所有依赖已满足"
+    fi
+    
+    return 0
+}
+
+# Install dependencies
+if ! install_dependencies; then
+    log_error "依赖安装失败，无法继续"
     exit 1
 fi
-log_success "依赖检查通过"
+
+# Clone repository if in remote mode
+if [ "$REMOTE_MODE" = true ]; then
+    log_info "从远程仓库克隆工具包..."
+    
+    # Clean up temp directory if exists
+    rm -rf "$TEMP_DIR" 2>/dev/null || true
+    
+    # Clone repository
+    if git clone --quiet --depth 1 "$REPO_URL" "$TEMP_DIR"; then
+        log_success "仓库克隆完成"
+        SCRIPT_DIR="$TEMP_DIR"
+        
+        # Source config from cloned repo
+        if [ -f "$SCRIPT_DIR/config.sh" ]; then
+            source "$SCRIPT_DIR/config.sh"
+        else
+            log_error "无法找到 config.sh"
+            rm -rf "$TEMP_DIR"
+            exit 1
+        fi
+    else
+        log_error "仓库克隆失败"
+        rm -rf "$TEMP_DIR"
+        exit 1
+    fi
+fi
 
 # 创建安装目录
 log_info "创建安装目录: $INSTALL_DIR"
@@ -128,3 +233,10 @@ echo ""
 echo "或直接运行："
 echo -e "  ${COLOR_CYAN}bash $INSTALL_DIR/menu.sh${COLOR_RESET}"
 echo ""
+
+# Clean up temp directory if in remote mode
+if [ "$REMOTE_MODE" = true ]; then
+    log_info "清理临时文件..."
+    rm -rf "$TEMP_DIR" 2>/dev/null || true
+    log_success "临时文件已清理"
+fi
