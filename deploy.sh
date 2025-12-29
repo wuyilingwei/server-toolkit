@@ -1,7 +1,7 @@
 #!/bin/bash
 # Server Toolkit Deployment Script
-# This script installs the toolkit to /srv/server-toolkit
-# Can be run locally or directly from remote URL
+# This script should be run directly from remote URL
+# Usage: curl -sSL https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/deploy.sh | sudo bash
 
 set -e
 
@@ -10,8 +10,9 @@ INSTALL_DIR="/srv/server-toolkit"
 BIN_LINK="/usr/local/bin/server-toolkit"
 REPO_URL="https://github.com/wuyilingwei/server-toolkit"
 TEMP_DIR="/tmp/server-toolkit-$$"
+DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
 
-# Color codes (inline for remote execution)
+# Color codes
 COLOR_RESET="\033[0m"
 COLOR_BLUE="\033[1;34m"
 COLOR_GREEN="\033[1;32m"
@@ -19,7 +20,7 @@ COLOR_YELLOW="\033[1;33m"
 COLOR_RED="\033[1;31m"
 COLOR_CYAN="\033[1;36m"
 
-# Simple logging functions
+# Logging functions
 log_info() {
     echo -e "${COLOR_BLUE}[INFO]${COLOR_RESET} $1"
 }
@@ -36,34 +37,55 @@ log_error() {
     echo -e "${COLOR_RED}[错误]${COLOR_RESET} $1"
 }
 
-# Detect if running from remote (piped input) or local
-SCRIPT_DIR=""
-if [ -n "${BASH_SOURCE[0]}" ] && [ "${BASH_SOURCE[0]}" != "bash" ]; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-fi
+# Configuration helper functions (inline for standalone operation)
+get_config_value() {
+    local key="$1"
+    local default="$2"
+    
+    if [ -f /etc/environment ]; then
+        local value=$(grep "^${key}=" /etc/environment | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+        echo "${value:-$default}"
+    else
+        echo "$default"
+    fi
+}
 
-# Check if we have a valid script directory with config.sh
-if [ -z "$SCRIPT_DIR" ] || [ ! -f "$SCRIPT_DIR/config.sh" ]; then
-    REMOTE_MODE=true
-    log_info "检测到远程执行模式"
-else
-    REMOTE_MODE=false
-    log_info "检测到本地执行模式"
-    # Source config only if in local mode
-    source "$SCRIPT_DIR/config.sh"
-fi
+set_config_value() {
+    local key="$1"
+    local value="$2"
+    
+    if [ ! -f /etc/environment ]; then
+        touch /etc/environment
+    fi
+    
+    # 删除旧值
+    sed -i "/^${key}=/d" /etc/environment 2>/dev/null
+    
+    # 添加新值
+    echo "${key}=\"${value}\"" >> /etc/environment
+    
+    # 导出到当前环境
+    export ${key}="${value}"
+}
+
+get_device_uuid() {
+    get_config_value "SYS_DEVICE_UUID" "未配置"
+}
+
+get_vault_url() {
+    get_config_value "SYS_VAULT_URL" "$DEFAULT_VAULT_URL"
+}
 
 echo ""
 echo -e "${COLOR_CYAN}==================================================${COLOR_RESET}"
-echo -e "${COLOR_BLUE}    Server Toolkit 部署脚本${COLOR_RESET}"
+echo -e "${COLOR_BLUE}    Server Toolkit 远程部署脚本${COLOR_RESET}"
 echo -e "${COLOR_CYAN}==================================================${COLOR_RESET}"
 echo ""
 
 # 检查 root 权限
 if [ "$EUID" -ne 0 ]; then 
     log_error "此脚本需要 root 权限运行"
-    echo "请使用: sudo bash deploy.sh"
-    echo "或远程执行: curl -sSL https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/deploy.sh | sudo bash"
+    echo "请使用: curl -sSL https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/deploy.sh | sudo bash"
     exit 1
 fi
 
@@ -108,40 +130,28 @@ if ! install_dependencies; then
     exit 1
 fi
 
-# Clone repository if in remote mode
-if [ "$REMOTE_MODE" = true ]; then
-    log_info "从远程仓库克隆工具包..."
-    
-    # Clean up temp directory if exists
-    rm -rf "$TEMP_DIR" 2>/dev/null || true
-    
-    # Clone repository
-    if git clone --quiet --depth 1 "$REPO_URL" "$TEMP_DIR"; then
-        log_success "仓库克隆完成"
-        SCRIPT_DIR="$TEMP_DIR"
-        
-        # Source config from cloned repo
-        if [ -f "$SCRIPT_DIR/config.sh" ]; then
-            source "$SCRIPT_DIR/config.sh"
-        else
-            log_error "无法找到 config.sh"
-            rm -rf "$TEMP_DIR"
-            exit 1
-        fi
-    else
-        log_error "仓库克隆失败"
-        rm -rf "$TEMP_DIR"
-        exit 1
-    fi
+# Clone main module from remote repository
+log_info "从远程仓库拉取主模块..."
+
+# Clean up temp directory if exists
+rm -rf "$TEMP_DIR" 2>/dev/null || true
+
+# Clone repository
+if git clone --quiet --depth 1 "$REPO_URL" "$TEMP_DIR"; then
+    log_success "主模块拉取完成"
+else
+    log_error "主模块拉取失败"
+    rm -rf "$TEMP_DIR"
+    exit 1
 fi
 
-# 创建安装目录
-log_info "创建安装目录: $INSTALL_DIR"
+# 部署主模块到 /srv
+log_info "部署主模块到 $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 
-# 复制文件
-log_info "复制工具包文件..."
-cp -r "$SCRIPT_DIR"/* "$INSTALL_DIR/" 2>/dev/null || true
+# 复制主模块文件
+log_info "复制主模块文件..."
+cp -r "$TEMP_DIR"/* "$INSTALL_DIR/" 2>/dev/null || true
 chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null || true
 chmod +x "$INSTALL_DIR"/*/*.sh 2>/dev/null || true
 
@@ -150,8 +160,7 @@ if [ ! -d "$INSTALL_DIR/.git" ]; then
     log_info "初始化 Git 仓库..."
     cd "$INSTALL_DIR"
     git init
-    local repo_url=$(get_remote_repo)
-    git remote add origin "$repo_url" 2>/dev/null || true
+    git remote add origin "$REPO_URL" 2>/dev/null || true
 fi
 
 # 创建本地 config.json（如果不存在）
@@ -227,16 +236,14 @@ echo -e "${COLOR_GREEN}==================================================${COLOR
 echo -e "${COLOR_GREEN}              部署完成！${COLOR_RESET}"
 echo -e "${COLOR_GREEN}==================================================${COLOR_RESET}"
 echo ""
+echo "主模块已部署到: $INSTALL_DIR"
+echo "子模块由主模块统一管理"
+echo ""
 echo "使用以下命令启动工具包菜单："
 echo -e "  ${COLOR_CYAN}server-toolkit${COLOR_RESET}"
 echo ""
-echo "或直接运行："
-echo -e "  ${COLOR_CYAN}bash $INSTALL_DIR/menu.sh${COLOR_RESET}"
-echo ""
 
-# Clean up temp directory if in remote mode
-if [ "$REMOTE_MODE" = true ]; then
-    log_info "清理临时文件..."
-    rm -rf "$TEMP_DIR" 2>/dev/null || true
-    log_success "临时文件已清理"
-fi
+# Clean up temp directory
+log_info "清理临时文件..."
+rm -rf "$TEMP_DIR" 2>/dev/null || true
+log_success "临时文件已清理"
