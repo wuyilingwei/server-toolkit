@@ -137,7 +137,7 @@ update_modules() {
     if [ -n "$installed_modules" ]; then
         echo ""
         echo -e "${COLOR_GREEN}已安装的持久化模块:${COLOR_RESET}"
-        echo "$installed_modules" | while read line; do
+        echo "$installed_modules" | while read -r line; do
             echo "  - $line"
         done
         echo ""
@@ -194,8 +194,8 @@ execute_module() {
     log_info "正在从远程执行: $script_path"
     echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
     
-    # 直接从远程执行脚本
-    curl -s -L "$script_url" | bash
+    # 直接从远程执行脚本，添加超时保护
+    curl -s -L -m 300 "$script_url" | bash
     local exit_code=$?
     
     echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
