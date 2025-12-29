@@ -20,55 +20,63 @@ check_for_updates() {
     fi
 }
 
-# 执行自更新
+# 执行自更新 (仅更新核心文件)
 do_self_update() {
     echo ""
     echo -e "${COLOR_CYAN}==================== 工具包自更新 ====================${COLOR_RESET}"
     
     local install_dir=$(get_install_dir)
     
-    if [ ! -d "$install_dir/.git" ]; then
-        log_error "未检测到 Git 仓库，无法自动更新"
-        log_info "请重新运行 deploy.sh 进行全新安装"
+    log_info "正在检查核心组件更新..."
+    
+    # 获取远程配置
+    local remote_config=$(curl -s -m 10 "$RAW_REPO_URL/config.json")
+    if [ -z "$remote_config" ]; then
+        log_error "无法获取远程配置"
         return 1
     fi
     
-    cd "$install_dir" || return 1
+    local remote_version=$(echo "$remote_config" | jq -r '.version // "0.0.0"')
+    local local_config=$(read_repo_config)
+    local local_version=$(echo "$local_config" | jq -r '.version // "0.0.0"')
     
-    # 检测默认分支
-    local default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-    if [ -z "$default_branch" ]; then
-        # 尝试常见分支名
-        default_branch="main"
-        git show-ref --verify --quiet refs/remotes/origin/master && default_branch="master"
+    log_info "当前版本: v$local_version"
+    log_info "最新版本: v$remote_version"
+    
+    # 检查是否需要更新
+    if version_ge "$local_version" "$remote_version"; then
+        log_success "核心组件已是最新版本"
+        return 0
     fi
     
-    log_info "拉取最新代码..."
-    if git pull origin "$default_branch"; then
-        log_success "更新成功！"
+    echo -n "发现新版本 v$remote_version，是否更新核心组件? (y/n): "
+    read confirm
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+        log_info "已取消更新"
+        return 0
+    fi
+    
+    log_info "正在更新核心文件..."
+    local update_failed=false
+    
+    # 更新核心文件列表
+    for file in "config.json" "config.sh" "menu.sh"; do
+        log_info "下载 $file..."
+        if ! download_from_repo "$file" "$install_dir/$file"; then
+            log_error "下载 $file 失败"
+            update_failed=true
+        fi
+    done
+    
+    if [ "$update_failed" = "true" ]; then
+        log_error "部分文件更新失败"
+        return 1
+    else
+        chmod +x "$install_dir/menu.sh"
+        log_success "核心组件更新成功！"
         log_info "重新加载配置..."
         source "$install_dir/config.sh"
         return 0
-    else
-        log_error "更新失败"
-        echo -e "${COLOR_YELLOW}可能是因为本地文件有修改导致冲突。${COLOR_RESET}"
-        echo -n "是否强制更新 (将丢弃本地修改)? (y/n): "
-        read force_update
-        
-        if [ "$force_update" = "y" ] || [ "$force_update" = "Y" ]; then
-            log_info "正在强制更新..."
-            git fetch origin
-            if git reset --hard "origin/$default_branch"; then
-                log_success "强制更新成功！"
-                log_info "重新加载配置..."
-                source "$install_dir/config.sh"
-                return 0
-            else
-                log_error "强制更新失败"
-                return 1
-            fi
-        fi
-        return 1
     fi
 }
 
@@ -118,7 +126,38 @@ configure_device_uuid() {
 update_modules() {
     echo ""
     echo -e "${COLOR_CYAN}==================== 更新模块 ====================${COLOR_RESET}"
-    log_info "模块更新功能将在后续版本实现"
+    
+    local install_dir=$(get_install_dir)
+    local config=$(read_repo_config)
+    local modules=$(echo "$config" | jq -c '.modules[]?' 2>/dev/null)
+    local updated_count=0
+    
+    if [ -n "$modules" ]; then
+        echo "$modules" | while IFS= read -r module; do
+            local script=$(echo "$module" | jq -r '.script')
+            local name=$(echo "$module" | jq -r '.name')
+            local full_path="$install_dir/$script"
+            
+            # 仅更新已安装（文件存在）的模块
+            if [ -f "$full_path" ]; then
+                log_info "正在更新: $name ($script)..."
+                if download_from_repo "$script" "$full_path"; then
+                    chmod +x "$full_path"
+                    log_success "更新完成"
+                    updated_count=$((updated_count + 1))
+                else
+                    log_error "更新失败"
+                fi
+            fi
+        done
+    fi
+    
+    if [ "$updated_count" -eq 0 ]; then
+        log_info "没有发现已安装的模块，或无需更新"
+    else
+        echo ""
+        log_success "所有已安装模块更新完毕"
+    fi
     echo ""
 }
 
@@ -157,11 +196,19 @@ show_current_config() {
 # 执行模块脚本
 execute_module() {
     local script_path="$1"
-    local full_path="$SCRIPT_DIR/$script_path"
+    local install_dir=$(get_install_dir)
+    local full_path="$install_dir/$script_path"
     
+    # 检查并自动下载模块
     if [ ! -f "$full_path" ]; then
-        log_error "脚本文件不存在: $full_path"
-        return 1
+        log_info "模块尚未安装，正在下载..."
+        if download_from_repo "$script_path" "$full_path"; then
+            chmod +x "$full_path"
+            log_success "模块下载完成"
+        else
+            log_error "模块下载失败: $script_path"
+            return 1
+        fi
     fi
     
     if [ ! -x "$full_path" ]; then

@@ -4,6 +4,7 @@
 
 CONFIG_VERSION="1.0.0"
 TOOLKIT_REPO="https://github.com/wuyilingwei/server-toolkit"
+RAW_REPO_URL="https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main"
 DEFAULT_INSTALL_DIR="/srv/server-toolkit"
 DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
 
@@ -137,24 +138,24 @@ version_ge() {
 # 检查远程是否有更新
 check_remote_update() {
     local install_dir=$(get_install_dir)
-    local remote_repo=$(get_remote_repo)
     
-    if [ ! -d "$install_dir/.git" ]; then
-        return 1
+    # 获取本地版本
+    local local_config=$(read_repo_config)
+    local local_version=$(echo "$local_config" | jq -r '.version // "0.0.0"')
+    
+    # 获取远程版本
+    local remote_config=$(curl -s -m 5 "$RAW_REPO_URL/config.json")
+    if [ -z "$remote_config" ] || ! echo "$remote_config" | jq -e . >/dev/null 2>&1; then
+        return 1 # 无法获取远程配置
     fi
     
-    cd "$install_dir" || return 1
+    local remote_version=$(echo "$remote_config" | jq -r '.version // "0.0.0"')
     
-    # 获取远程最新版本
-    git fetch origin --quiet 2>/dev/null || return 1
-    
-    local local_commit=$(git rev-parse HEAD 2>/dev/null)
-    local remote_commit=$(git rev-parse origin/main 2>/dev/null || git rev-parse origin/master 2>/dev/null)
-    
-    if [ "$local_commit" != "$remote_commit" ]; then
-        return 0  # 有更新
+    # 比较版本 (如果 remote > local，返回 0)
+    if version_ge "$remote_version" "$local_version" && [ "$remote_version" != "$local_version" ]; then
+        return 0
     else
-        return 1  # 无更新
+        return 1
     fi
 }
 
@@ -202,6 +203,22 @@ read_repo_config() {
         cat "$config_file"
     else
         echo "{}"
+    fi
+}
+
+# 从远程仓库下载文件
+download_from_repo() {
+    local remote_path="$1"
+    local local_path="$2"
+    local url="$RAW_REPO_URL/$remote_path"
+    
+    # 创建父目录
+    mkdir -p "$(dirname "$local_path")"
+    
+    if curl -s -L -o "$local_path" "$url"; then
+        return 0
+    else
+        return 1
     fi
 }
 

@@ -9,7 +9,7 @@ set -e
 INSTALL_DIR="/srv/server-toolkit"
 BIN_LINK="/usr/local/bin/server-toolkit"
 REPO_URL="https://github.com/wuyilingwei/server-toolkit"
-TEMP_DIR=$(mktemp -d -t server-toolkit.XXXXXXXXXX)
+RAW_REPO_URL="https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main"
 DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
 
 # Color codes
@@ -100,7 +100,7 @@ install_dependencies() {
     fi
     
     # Whitelist of allowed packages
-    local allowed_packages="curl jq git procps"
+    local allowed_packages="curl jq procps"
     local missing_pkgs=()
     
     # Check curl
@@ -111,11 +111,6 @@ install_dependencies() {
     # Check jq
     if ! command -v jq &> /dev/null; then
         missing_pkgs+=(jq)
-    fi
-    
-    # Check git
-    if ! command -v git &> /dev/null; then
-        missing_pkgs+=(git)
     fi
     
     # Check free (part of procps package)
@@ -168,47 +163,32 @@ log_info "从远程仓库拉取主模块..."
 
 # Clone repository to temp directory (mktemp already created it)
 if git clone --quiet --depth 1 "$REPO_URL" "$TEMP_DIR"; then
-    log_success "主模块拉取完成"
-else
-    log_error "主模块拉取失败"
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-
-# 部署主模块到 /srv
+  部署主模块到 /srv
 log_info "部署主模块到 $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 
-# 复制主模块文件 (including hidden files)
-log_info "复制主模块文件..."
-cp -r "$TEMP_DIR/." "$INSTALL_DIR/" 2>/dev/null || true
-chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null || true
-chmod +x "$INSTALL_DIR"/*/*.sh 2>/dev/null || true
-
-# 初始化 git 仓库（如果不存在）
-if [ ! -d "$INSTALL_DIR/.git" ]; then
-    log_info "初始化 Git 仓库..."
-    cd "$INSTALL_DIR"
-    git init
-    git remote add origin "$REPO_URL" 2>/dev/null || true
-fi
-
-# 创建本地 config.json（如果不存在）
-if [ ! -f "$INSTALL_DIR/config.json" ]; then
-    log_info "创建本地配置文件..."
-    cat > "$INSTALL_DIR/config.json" << 'EOF'
-{
-  "installed_modules": [],
-  "last_update": "",
-  "local_version": "1.0.0"
+# 下载核心文件
+log_info "下载核心组件..."
+download_file() {
+    local file="$1"
+    local url="$RAW_REPO_URL/$file"
+    log_info "下载 $file..."
+    if curl -s -L -o "$INSTALL_DIR/$file" "$url"; then
+        return 0
+    else
+        log_error "下载 $file 失败"
+        return 1
+    fi
 }
-EOF
-fi
 
-# 创建 server-toolkit 命令
-log_info "创建系统命令: server-toolkit"
-cat > "$BIN_LINK" << EOF
-#!/bin/bash
+for file in "config.json" "config.sh" "menu.sh"; do
+    if ! download_file "$file"; then
+        log_error "核心组件下载失败，部署终止"
+        exit 1
+    fi
+done
+
+chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null/bin/bash
 cd "$INSTALL_DIR"
 bash "$INSTALL_DIR/menu.sh" "\$@"
 EOF
