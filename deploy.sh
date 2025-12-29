@@ -93,15 +93,38 @@ fi
 install_dependencies() {
     log_info "检查并安装系统依赖..."
     
-    local missing_deps=()
-    for cmd in curl jq git free df; do
-        if ! command -v $cmd &> /dev/null; then
-            missing_deps+=($cmd)
-        fi
-    done
+    # Check if apt-get is available (Debian/Ubuntu-based systems)
+    if ! command -v apt-get &> /dev/null; then
+        log_error "此脚本目前仅支持基于 Debian/Ubuntu 的系统"
+        return 1
+    fi
     
-    if [ ${#missing_deps[@]} -ne 0 ]; then
-        log_warning "缺少以下依赖: ${missing_deps[*]}"
+    local missing_pkgs=()
+    
+    # Check curl
+    if ! command -v curl &> /dev/null; then
+        missing_pkgs+=(curl)
+    fi
+    
+    # Check jq
+    if ! command -v jq &> /dev/null; then
+        missing_pkgs+=(jq)
+    fi
+    
+    # Check git
+    if ! command -v git &> /dev/null; then
+        missing_pkgs+=(git)
+    fi
+    
+    # Check free (part of procps package)
+    if ! command -v free &> /dev/null; then
+        missing_pkgs+=(procps)
+    fi
+    
+    # Note: df is part of coreutils which is essential and should already be installed
+    
+    if [ ${#missing_pkgs[@]} -ne 0 ]; then
+        log_warning "缺少以下软件包: ${missing_pkgs[*]}"
         log_info "正在自动安装依赖..."
         
         # Update package list
@@ -110,8 +133,8 @@ install_dependencies() {
             return 1
         }
         
-        # Install missing dependencies
-        apt-get install -y -qq ${missing_deps[*]} || {
+        # Install missing packages
+        apt-get install -y -qq ${missing_pkgs[*]} || {
             log_error "依赖安装失败"
             return 1
         }
