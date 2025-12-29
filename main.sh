@@ -96,7 +96,7 @@ fetch_operations_from_cloud() {
         return 1
     fi
     
-    local response=$(curl -s -k -m 10 -X POST "$vault_url" \
+    local response=$(curl -s -m 10 -X POST "$vault_url" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $device_uuid" \
         -d '{"ops": [{"id": "get_operations", "type": "read", "module": "toolkit", "key": "operations"}]}' 2>/dev/null)

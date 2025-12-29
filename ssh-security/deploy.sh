@@ -7,7 +7,8 @@ DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
 # 1. 交互式检查环境变量
 if ! grep -q "SYS_DEVICE_UUID" /etc/environment; then
     echo "未发现 SYS_DEVICE_UUID，请输入您的 Vault Token (UUID):"
-    read user_token
+    read -s user_token
+    echo ""
     if [ -n "$user_token" ]; then
         echo "SYS_DEVICE_UUID=\"$user_token\"" >> /etc/environment
         export SYS_DEVICE_UUID="$user_token"
@@ -45,7 +46,11 @@ if ! grep -q "SYS_VAULT_URL" /etc/environment; then
 fi
 
 # 2. 安装依赖
-apt update && apt install -y jq curl ipset iptables
+if ! apt update; then
+    echo "错误: 软件包列表更新失败"
+    exit 1
+fi
+apt install -y jq curl ipset iptables
 
 # 3. 创建目录与脚本
 mkdir -p /srv/ssh-security
@@ -65,7 +70,7 @@ cleanup_drop() {
 }
 
 # 1. 获取响应
-RESPONSE=$(curl -s -k -m 10 -X POST "$VAULT_URL" \
+RESPONSE=$(curl -s -m 10 -X POST "$VAULT_URL" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $TOKEN" \
     -d "{\"ops\": [{\"id\": \"get_wl\", \"type\": \"read\", \"module\": \"ip\", \"key\": \"whitelist\"}]}")

@@ -14,7 +14,10 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "正在更新软件包列表..."
-apt update
+if ! apt update; then
+    echo "错误: 软件包列表更新失败"
+    exit 1
+fi
 
 echo ""
 echo "正在升级已安装的软件包..."
