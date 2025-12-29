@@ -35,8 +35,16 @@ do_self_update() {
     
     cd "$install_dir" || return 1
     
+    # 检测默认分支
+    local default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    if [ -z "$default_branch" ]; then
+        # 尝试常见分支名
+        default_branch="main"
+        git show-ref --verify --quiet refs/remotes/origin/master && default_branch="master"
+    fi
+    
     log_info "拉取最新代码..."
-    if git pull origin main 2>/dev/null || git pull origin master 2>/dev/null; then
+    if git pull origin "$default_branch" 2>/dev/null; then
         log_success "更新成功！"
         log_info "重新加载配置..."
         source "$install_dir/config.sh"
@@ -199,6 +207,8 @@ show_menu() {
 
 # 主循环
 main_loop() {
+    local HAS_UPDATE=false
+    
     # 读取配置
     local config=$(read_repo_config)
     

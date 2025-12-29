@@ -45,7 +45,8 @@ if [ ! -d "$INSTALL_DIR/.git" ]; then
     log_info "初始化 Git 仓库..."
     cd "$INSTALL_DIR"
     git init
-    git remote add origin "https://github.com/wuyilingwei/server-toolkit.git" 2>/dev/null || true
+    local repo_url=$(get_remote_repo)
+    git remote add origin "$repo_url" 2>/dev/null || true
 fi
 
 # 创建本地 config.json（如果不存在）
