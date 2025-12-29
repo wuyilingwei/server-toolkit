@@ -17,7 +17,16 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source helper
-source "$SCRIPT_DIR/helper.sh"
+if [ ! -f "$SCRIPT_DIR/helper.sh" ]; then
+    echo "错误: 找不到 helper.sh"
+    echo "请重新运行部署脚本"
+    exit 1
+fi
+
+if ! source "$SCRIPT_DIR/helper.sh"; then
+    echo "错误: 加载 helper.sh 失败"
+    exit 1
+fi
 
 # 检查更新
 check_for_updates() {
@@ -43,7 +52,8 @@ do_self_update() {
     # 检查 scripts 目录是否存在
     if [ ! -d "$scripts_dir/.git" ]; then
         log_error "未找到 Git 仓库目录: $scripts_dir"
-        log_info "请重新运行 deploy.sh"
+        log_info "请重新运行部署脚本："
+        log_info "  curl -sSL https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/deploy.sh | sudo bash"
         return 1
     fi
     
@@ -210,7 +220,7 @@ execute_module() {
     # 检查脚本是否存在
     if [ ! -f "$local_script" ]; then
         log_error "模块脚本不存在: $local_script"
-        log_info "请尝试更新工具包（选项 3）"
+        log_info "请尝试更新工具包（菜单选项 3）"
         return 1
     fi
     

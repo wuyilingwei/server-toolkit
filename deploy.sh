@@ -127,6 +127,7 @@ install_dependencies() {
     fi
     
     # Note: df is part of coreutils which is essential and should already be installed
+    # Note: free is part of procps package
     
     if [ ${#missing_pkgs[@]} -ne 0 ]; then
         # Validate all packages are in whitelist

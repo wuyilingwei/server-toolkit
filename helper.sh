@@ -6,12 +6,13 @@
 WORKDIR="/srv/server-toolkit"
 # 确保工作目录存在
 mkdir -p "$WORKDIR" 2>/dev/null || true
-# 强制设置工作目录，如果失败则修改权限（非致命错误）
+# 强制设置工作目录
 if ! cd "$WORKDIR" 2>/dev/null; then
-    # 如果无法进入，尝试修复权限
+    # 如果无法进入，尝试修复权限后再试
     chmod 755 "$WORKDIR" 2>/dev/null || true
     mkdir -p "$WORKDIR" 2>/dev/null || true
-    cd "$WORKDIR" 2>/dev/null || true
+    # 最后尝试进入，如果仍然失败则记录但不退出（在此处失败是非致命的）
+    cd "$WORKDIR" 2>/dev/null || echo "[警告] 无法切换到工作目录 $WORKDIR，将在当前目录继续" >&2
 fi
 # ====================================
 
