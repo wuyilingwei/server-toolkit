@@ -18,6 +18,28 @@ SIZE="${1:-}"
 
 [ "$EUID" -eq 0 ] || { echo "请以root运行（sudo）"; exit 1; }
 
+# 0. 显示当前 Swap 状态
+echo ""
+echo "=========================================="
+echo "当前系统 Swap 状态："
+echo "=========================================="
+swapon --show=NAME,SIZE,USED || echo "（无活跃 Swap）"
+echo ""
+if [ -f /etc/fstab ]; then
+    echo "Fstab 中的 Swap 配置："
+    grep -E "swap" /etc/fstab || echo "（无 Swap 配置）"
+    echo ""
+fi
+
+# 提示覆盖警告
+echo "警告: 即将对 Swap 进行以下操作："
+echo "  - 目标路径: $SWAPFILE"
+if [ -f "$SWAPFILE" ]; then
+    local existing_size=$(du -h "$SWAPFILE" | cut -f1)
+    echo "  - 现有大小: $existing_size (将被覆盖)"
+fi
+echo ""
+
 # 1. 询问交换区大小
 if [ -z "$SIZE" ]; then 
     read -rp "目标交换区大小(如 8G/512M，默认 2G): " SIZE
@@ -43,6 +65,25 @@ MIB="$(parse "$SIZE")"
 echo -e "\n[?] 什么是 Swappiness? (0-100)\n    - 较小值(如 10): 优先使用物理内存，减少磁盘IO，适合机械硬盘或低性能云硬盘。\n    - 较大值(如 60): 积极将冷数据换出到Swap，腾出内存给Cache，适合高并发场景。"
 CUR_SWAP=$(cat /proc/sys/vm/swappiness)
 read -rp "设置 Swappiness (当前 $CUR_SWAP, 建议 10, 默认不修改): " NEW_SWAP
+
+# 最终确认
+echo ""
+echo "=========================================="
+echo "配置摘要："
+echo "=========================================="
+echo "Swap 文件路径: $SWAPFILE"
+echo "新 Swap 大小: $SIZE ($MIB MiB)"
+if [ -n "$NEW_SWAP" ]; then
+    echo "新 Swappiness: $NEW_SWAP"
+else
+    echo "Swappiness: 保持不变 (当前 $CUR_SWAP)"
+fi
+echo ""
+read -rp "确认进行以上操作? (y/n): " confirm
+if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+    echo "已取消操作"
+    exit 0
+fi
 
 # 3. 执行 Swap 创建
 echo "[*] 设定 $SWAPFILE -> $MIB MiB ($SIZE)"
@@ -76,3 +117,4 @@ fi
 
 echo "[+] 任务完成:"
 free -h
+
