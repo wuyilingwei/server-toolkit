@@ -79,7 +79,8 @@ if ! echo "$RESPONSE" | jq -e '.[0].status == 200' >/dev/null 2>&1; then
 fi
 
 # Parse domains
-DOMAINS=$(echo "$RESPONSE" | jq -r '.[0].data.list[]? // empty')
+# Handle data as direct array or object with list property
+DOMAINS=$(echo "$RESPONSE" | jq -r '.[0].data | if type=="array" then .[] else .list[] end // empty')
 
 if [ -z "$DOMAINS" ]; then
     log_error "未找到可用的证书授权"
