@@ -276,7 +276,14 @@ get_installed_version() {
     local module_id="$1"
     local installed=$(read_installed_config)
     
-    echo "$installed" | jq -r --arg id "$module_id" '.modules[] | select(.id == $id) | .version // "未安装"'
+    local version=$(echo "$installed" | jq -r --arg id "$module_id" '.modules[] | select(.id == $id) | .version')
+    
+    # 如果版本为空，返回"未安装"
+    if [ -z "$version" ]; then
+        echo "未安装"
+    else
+        echo "$version"
+    fi
 }
 
 # 记录模块安装
