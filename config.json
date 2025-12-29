@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "min_config_version": "1.0.0",
+  "modules": [
+    {
+      "id": "ssh-security",
+      "name": "SSH 安全防护部署",
+      "description": "基于 Vault 白名单的 SSH 安全防护系统",
+      "script": "ssh-security/deploy.sh",
+      "min_config_version": "1.0.0",
+      "menu_id": 10,
+      "enabled": true
+    },
+    {
+      "id": "system-update",
+      "name": "系统更新",
+      "description": "自动化系统更新和维护",
+      "script": "system/update.sh",
+      "min_config_version": "1.0.0",
+      "menu_id": 11,
+      "enabled": true
+    }
+  ],
+  "reserved_menu": {
+    "0": "退出",
+    "1": "配置 Vault URL",
+    "2": "配置设备 UUID",
+    "3": "工具包自更新",
+    "4": "更新模块",
+    "5": "显示当前配置",
+    "6-9": "保留项"
+  }
+}
