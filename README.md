@@ -31,10 +31,9 @@ server-toolkit/
 ### 本地结构（/srv/server-toolkit）
 
 部署后，工具包安装在 `/srv/server-toolkit/`，包含：
-- 所有仓库文件的副本
-- 本地 `config.json`（跟踪已安装模块）
-- 模块持久化数据目录
-- Git 仓库（用于自动更新）
+- 核心文件（`config.json`、`config.sh`、`menu.sh`）
+- 按需下载的模块文件（首次使用时自动下载）
+- 模块持久化数据目录（模块需要时创建）
 
 ## 快速开始
 
@@ -53,14 +52,13 @@ wget -qO- https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/depl
 ```
 
 部署脚本会自动：
-- 检测并安装缺失的系统依赖（curl、jq、git 等）
-- 从远程仓库拉取主模块
+- 检测并安装缺失的系统依赖（curl、jq、procps 等）
+- 下载核心组件（config.json、config.sh、menu.sh）
 - 将工具包部署到 `/srv/server-toolkit/`
 - 创建 `server-toolkit` 系统命令
 - 配置环境变量（Vault URL、设备 UUID 等）
-- 初始化 Git 仓库用于自动更新
 
-子模块由主模块统一管理和引用。
+模块文件在首次使用时自动从远程仓库下载。
 
 ### 启动工具包
 
@@ -276,8 +274,11 @@ curl -X POST "https://vault.wuyilingwei.com/api/data" \
 
 ```
 ==================== 工具包自更新 ====================
-[INFO] 拉取最新代码...
-[成功] 更新成功！
+[INFO] 正在检查核心组件更新...
+[INFO] 当前版本: v1.0.0
+[INFO] 最新版本: v1.1.0
+[INFO] 正在更新核心文件...
+[成功] 核心组件更新成功！
 [INFO] 重新加载配置...
 ```
 
@@ -312,9 +313,9 @@ tail -f /var/log/ssh_security.log
 
 ### 自动更新失败
 
-1. 确保有 Git 访问权限
-2. 检查 `/srv/server-toolkit/.git` 是否存在
-3. 手动运行：`cd /srv/server-toolkit && git pull`
+1. 检查网络连接到 GitHub
+2. 验证可以访问 `https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/`
+3. 检查防火墙是否阻止出站 HTTPS 连接
 
 ### server-toolkit 命令不可用
 
