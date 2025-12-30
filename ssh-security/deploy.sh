@@ -13,6 +13,10 @@ if ! cd "$WORKDIR" 2>/dev/null; then
 fi
 # ====================================
 
+# Storage directory for persistent data
+STORAGE_DIR="$WORKDIR/storage/ssh-security"
+mkdir -p "$STORAGE_DIR"
+
 # 默认 Vault URL
 DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
 
@@ -64,9 +68,11 @@ if ! apt update; then
 fi
 apt install -y jq curl ipset iptables
 
-# 3. 创建目录与脚本
-mkdir -p /srv/ssh-security
-cat << "EOF" > /srv/ssh-security/sync.sh
+# 3. 创建同步脚本到 storage 目录
+SYNC_SCRIPT="$STORAGE_DIR/sync.sh"
+LOG_FILE="$STORAGE_DIR/sync.log"
+
+cat << "EOF" > "$SYNC_SCRIPT"
 #!/bin/sh
 #ssh-security: 带熔断保护的同步脚本
 
@@ -127,22 +133,24 @@ iptables -I INPUT 2 -p tcp --dport 22 -j DROP -m comment --comment "#ssh-securit
 echo "[$(date)] 同步成功。有效 IP 数量: \$(echo "\$IPS" | wc -l)"
 EOF
 
-chmod +x /srv/ssh-security/sync.sh
+chmod +x "$SYNC_SCRIPT"
 
 # 4. 管理 Crontab
 crontab -l 2>/dev/null | grep -v "#rsync-fail2ban" | grep -v "#ssh-security" > /tmp/cron_tmp
-echo "*/10 * * * * . /etc/environment; /bin/sh /srv/ssh-security/sync.sh >> /var/log/ssh_security.log 2>&1 #ssh-security" >> /tmp/cron_tmp
+echo "*/10 * * * * . /etc/environment; /bin/sh $SYNC_SCRIPT >> $LOG_FILE 2>&1 #ssh-security" >> /tmp/cron_tmp
 crontab /tmp/cron_tmp
 rm /tmp/cron_tmp
 
 # 5. 立即执行首次同步
-/bin/sh /srv/ssh-security/sync.sh
+/bin/sh "$SYNC_SCRIPT"
 
 echo "----------------------------------------------------------"
 echo "部署完成！层级防护已就绪。"
 echo "层级1：白名单 IP 放行 (IPSET: vault_global_whitelist)"
 echo "层级2：非白名单 SSH 丢弃 (DROP)"
 echo "熔断：若 API 异常，层级2 自动失效，确保管理入口可用。"
+echo "同步脚本: $SYNC_SCRIPT"
+echo "日志文件: $LOG_FILE"
 echo "----------------------------------------------------------"
 
 # 6. 交互式卸载 Fail2ban

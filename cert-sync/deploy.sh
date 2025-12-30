@@ -16,14 +16,12 @@ fi
 
 # Default Configuration
 DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
-# Use installation directory
-INSTALL_DIR="${SYS_TOOLKIT_DIR:-/srv/server-toolkit}"
-SYNC_SCRIPT_PATH="$INSTALL_DIR/cert-sync/worker.sh"
-LOG_FILE="$INSTALL_DIR/logs/cert-sync.log"
+# Storage directory for persistent data
+STORAGE_DIR="$WORKDIR/storage/cert-sync"
+mkdir -p "$STORAGE_DIR"
 
-# Ensure directories exist
-mkdir -p "$(dirname "$SYNC_SCRIPT_PATH")"
-mkdir -p "$(dirname "$LOG_FILE")"
+SYNC_SCRIPT_PATH="$STORAGE_DIR/worker.sh"
+LOG_FILE="$STORAGE_DIR/sync.log"
 
 # Color codes
 COLOR_RESET="\033[0m"
@@ -228,4 +226,5 @@ log_info "正在执行首次同步..."
 
 log_success "证书同步配置完成！"
 log_info "证书存储目录: /certs/"
+log_info "同步脚本: $SYNC_SCRIPT_PATH"
 log_info "日志文件: $LOG_FILE"

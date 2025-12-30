@@ -16,8 +16,17 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Source config
-source "$SCRIPT_DIR/config.sh"
+# Source helper
+if [ ! -f "$SCRIPT_DIR/helper.sh" ]; then
+    echo "错误: 找不到 helper.sh"
+    echo "请重新运行部署脚本"
+    exit 1
+fi
+
+if ! source "$SCRIPT_DIR/helper.sh"; then
+    echo "错误: 加载 helper.sh 失败"
+    exit 1
+fi
 
 # 检查更新
 check_for_updates() {
@@ -32,64 +41,69 @@ check_for_updates() {
     fi
 }
 
-# 执行自更新 (仅更新核心文件)
+# 执行自更新 (更新 scripts 仓库和核心文件)
 do_self_update() {
     echo ""
     echo -e "${COLOR_CYAN}==================== 工具包自更新 ====================${COLOR_RESET}"
     
     local install_dir=$(get_install_dir)
+    local scripts_dir="$install_dir/scripts"
     
-    log_info "正在检查核心组件更新..."
-    
-    # 获取远程配置
-    local remote_config=$(curl -s -m 10 "$RAW_REPO_URL/config.json")
-    if [ -z "$remote_config" ]; then
-        log_error "无法获取远程配置"
+    # 检查 scripts 目录是否存在
+    if [ ! -d "$scripts_dir/.git" ]; then
+        log_error "未找到 Git 仓库目录: $scripts_dir"
+        log_info "请重新运行部署脚本："
+        log_info "  curl -sSL https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/deploy.sh | sudo bash"
         return 1
     fi
     
-    local remote_version=$(echo "$remote_config" | jq -r '.version // "0.0.0"')
-    local local_config=$(read_repo_config)
-    local local_version=$(echo "$local_config" | jq -r '.version // "0.0.0"')
+    log_info "正在检查更新..."
+    
+    # 进入 scripts 目录
+    cd "$scripts_dir" || {
+        log_error "无法进入 scripts 目录"
+        return 1
+    }
+    
+    # 获取当前版本
+    local local_version=$(cat "$install_dir/config.json" | jq -r '.version // "0.0.0"')
+    
+    # 拉取最新代码
+    log_info "拉取最新代码..."
+    if ! git pull origin main; then
+        log_error "Git 拉取失败"
+        cd "$install_dir"
+        return 1
+    fi
+    
+    # 获取新版本
+    local remote_version=$(cat "$scripts_dir/config.json" | jq -r '.version // "0.0.0"')
     
     log_info "当前版本: v$local_version"
     log_info "最新版本: v$remote_version"
     
     # 检查是否需要更新
     if version_ge "$local_version" "$remote_version"; then
-        log_success "核心组件已是最新版本"
+        log_success "已是最新版本"
+        cd "$install_dir"
         return 0
     fi
     
-    echo -n "发现新版本 v$remote_version，是否更新核心组件? (y/n): "
-    read confirm
-    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-        log_info "已取消更新"
-        return 0
-    fi
+    # 复制核心文件
+    log_info "更新核心文件..."
+    cp "$scripts_dir/menu.sh" "$install_dir/"
+    cp "$scripts_dir/config.json" "$install_dir/"
+    cp "$scripts_dir/helper.sh" "$install_dir/"
     
-    log_info "正在更新核心文件..."
-    local update_failed=false
+    chmod +x "$install_dir/menu.sh"
+    chmod +x "$install_dir/helper.sh"
     
-    # 更新核心文件列表
-    for file in "config.json" "config.sh" "menu.sh"; do
-        log_info "下载 $file..."
-        if ! download_from_repo "$file" "$install_dir/$file"; then
-            log_error "下载 $file 失败"
-            update_failed=true
-        fi
-    done
+    cd "$install_dir"
     
-    if [ "$update_failed" = "true" ]; then
-        log_error "部分文件更新失败"
-        return 1
-    else
-        chmod +x "$install_dir/menu.sh"
-        log_success "核心组件更新成功！"
-        log_info "重新加载配置..."
-        source "$install_dir/config.sh"
-        return 0
-    fi
+    log_success "更新完成！新版本: v$remote_version"
+    log_info "重新加载配置..."
+    source "$install_dir/helper.sh"
+    return 0
 }
 
 # 配置 Vault URL
@@ -198,28 +212,28 @@ execute_module() {
     local module_version="$3"
     local needs_persistence="$4"
     local install_dir=$(get_install_dir)
+    local scripts_dir="$install_dir/scripts"
     
-    # 构建远程 URL
-    local script_url="$RAW_REPO_URL/$script_path"
+    # 构建本地脚本路径
+    local local_script="$scripts_dir/$script_path"
+    
+    # 检查脚本是否存在
+    if [ ! -f "$local_script" ]; then
+        log_error "模块脚本不存在: $local_script"
+        log_info "请尝试更新工具包（菜单选项 3）"
+        return 1
+    fi
     
     echo ""
-    log_info "正在从远程执行: $script_path"
+    log_info "正在执行模块: $script_path"
     echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
     
-    # 直接从远程执行脚本，添加超时保护和工作目录保护
-    # 为脚本注入工作目录检查代码
-    curl -s -L -m 300 "$script_url" | bash -c "
-        # 工作目录保护
-        WORKDIR='/srv/server-toolkit'
-        mkdir -p \"\$WORKDIR\"
-        if ! cd \"\$WORKDIR\" 2>/dev/null; then
-            chmod 755 \"\$WORKDIR\" 2>/dev/null || mkdir -p \"\$WORKDIR\"
-            cd \"\$WORKDIR\" || { echo '[错误] 无法访问工作目录'; exit 1; }
-        fi
-        # 执行远程脚本
-        bash
-    "
-    local exit_code=$?
+    # 执行本地脚本
+    if bash "$local_script"; then
+        local exit_code=0
+    else
+        local exit_code=$?
+    fi
     
     echo -e "${COLOR_CYAN}--------------------------------------------------${COLOR_RESET}"
     
