@@ -68,10 +68,20 @@ do_self_update() {
     # 获取当前版本
     local local_version=$(cat "$install_dir/config.json" | jq -r '.version // "0.0.0"')
     
-    # 拉取最新代码
-    log_info "拉取最新代码..."
-    if ! git pull origin main; then
-        log_error "Git 拉取失败"
+    # 使用强制同步方式拉取最新代码
+    log_info "执行强制 Git 同步..."
+    
+    # 获取远程更新
+    if ! git fetch origin main; then
+        log_error "Git fetch 失败"
+        cd "$install_dir"
+        return 1
+    fi
+    
+    # 强制重置到远程分支（丢弃本地修改）
+    log_info "重置到远程最新版本..."
+    if ! git reset --hard origin/main; then
+        log_error "Git reset 失败"
         cd "$install_dir"
         return 1
     fi
@@ -90,7 +100,7 @@ do_self_update() {
     fi
     
     # 复制核心文件
-    log_info "更新核心文件..."
+    log_info "提取核心文件..."
     cp "$scripts_dir/menu.sh" "$install_dir/"
     cp "$scripts_dir/config.json" "$install_dir/"
     cp "$scripts_dir/helper.sh" "$install_dir/"

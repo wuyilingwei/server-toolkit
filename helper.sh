@@ -136,6 +136,30 @@ get_storage_info() {
     echo "$disk_used / $disk_total ($disk_percent)"
 }
 
+# 获取 Swap 使用情况
+get_swap_info() {
+    # 一次性获取 swap 信息（包括数字和人类可读格式）
+    local swap_line_numeric=$(free | grep Swap: 2>/dev/null)
+    if [ -z "$swap_line_numeric" ]; then
+        echo "N/A"
+        return
+    fi
+    
+    local swap_line_human=$(free -h | grep Swap: 2>/dev/null)
+    local swap_total=$(echo "$swap_line_human" | awk '{print $2}')
+    local swap_used=$(echo "$swap_line_human" | awk '{print $3}')
+    
+    # 检查是否有 Swap
+    if [ "$swap_total" = "0B" ] || [ "$swap_total" = "0" ]; then
+        echo "未配置"
+        return
+    fi
+    
+    # 从数字格式计算使用百分比（避免再次调用 free）
+    local swap_percent=$(echo "$swap_line_numeric" | awk '{if($2>0) printf("%.0f", $3/$2 * 100); else print "0"}')
+    echo "$swap_used / $swap_total (${swap_percent}%)"
+}
+
 # 版本比较 (返回 0 表示 v1 >= v2)
 version_ge() {
     local v1="$1"
@@ -250,6 +274,7 @@ show_system_info() {
     
     echo -e "${COLOR_GREEN}[系统资源]${COLOR_RESET}"
     echo -e "  内存使用: $(get_memory_info)"
+    echo -e "  Swap 使用: $(get_swap_info)"
     echo -e "  存储使用: $(get_storage_info)"
     echo ""
     
