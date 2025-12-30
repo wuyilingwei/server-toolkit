@@ -35,7 +35,7 @@ fi
 echo "警告: 即将对 Swap 进行以下操作："
 echo "  - 目标路径: $SWAPFILE"
 if [ -f "$SWAPFILE" ]; then
-    local existing_size=$(du -h "$SWAPFILE" | cut -f1)
+    existing_size=$(du -h "$SWAPFILE" | cut -f1)
     echo "  - 现有大小: $existing_size (将被覆盖)"
 fi
 echo ""
