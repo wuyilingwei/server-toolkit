@@ -138,13 +138,16 @@ get_storage_info() {
 
 # 获取 Swap 使用情况
 get_swap_info() {
-    local swap_info=$(free -h | grep Swap:)
-    if [ -z "$swap_info" ]; then
+    # 一次性获取 swap 信息（包括数字和人类可读格式）
+    local swap_line_numeric=$(free | grep Swap: 2>/dev/null)
+    if [ -z "$swap_line_numeric" ]; then
         echo "N/A"
         return
     fi
-    local swap_total=$(echo $swap_info | awk '{print $2}')
-    local swap_used=$(echo $swap_info | awk '{print $3}')
+    
+    local swap_line_human=$(free -h | grep Swap: 2>/dev/null)
+    local swap_total=$(echo "$swap_line_human" | awk '{print $2}')
+    local swap_used=$(echo "$swap_line_human" | awk '{print $3}')
     
     # 检查是否有 Swap
     if [ "$swap_total" = "0B" ] || [ "$swap_total" = "0" ]; then
@@ -152,8 +155,8 @@ get_swap_info() {
         return
     fi
     
-    # 计算使用百分比
-    local swap_percent=$(free | grep Swap: | awk '{if($2>0) printf("%.0f", $3/$2 * 100); else print "0"}')
+    # 从数字格式计算使用百分比（避免再次调用 free）
+    local swap_percent=$(echo "$swap_line_numeric" | awk '{if($2>0) printf("%.0f", $3/$2 * 100); else print "0"}')
     echo "$swap_used / $swap_total (${swap_percent}%)"
 }
 
