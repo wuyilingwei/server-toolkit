@@ -88,49 +88,49 @@ cleanup_drop() {
 }
 
 # 1. 获取响应
-RESPONSE=\$(curl -s -m 10 -X POST "\$VAULT_URL" \\
-    -H "Content-Type: application/json" \\
-    -H "Authorization: Bearer \$TOKEN" \\
+RESPONSE=$(curl -s -m 10 -X POST "$VAULT_URL" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
     -d "{\"ops\": [{\"id\": \"get_wl\", \"type\": \"read\", \"module\": \"ip\", \"key\": \"whitelist\"}]}")
 
 # 2. 解析 IP 列表 (兼容空格与逗号)
-IPS=\$(echo "\$RESPONSE" | jq -r ".[0].data.content" 2>/dev/null | tr " ," "\\n" | tr -d "\\r\\"" | grep -E "^[0-9./]+")
+IPS=$(echo "$RESPONSE" | jq -r ".[0].data.content" 2>/dev/null | tr " ," "\n" | tr -d "\r\"" | grep -E "^[0-9./]+")
 
 # 3. [熔断逻辑] 如果 IPS 长度为 0 或解析失败
-if [ -z "\$IPS" ]; then
+if [ -z "$IPS" ]; then
     echo "[$(date)] 警告: 同步失败或白名单为空。为防止锁死，已撤回 DROP 拦截。"
     cleanup_drop
     exit 1
 fi
 
 # 4. 更新 IPSET (强制确保类型为 hash:net)
-EXISTING_TYPE=\$(ipset list "\$IPSET_NAME" -terse 2>/dev/null | grep Type | cut -d: -f2 | tr -d " ")
-if [ -n "\$EXISTING_TYPE" ] && [ "\$EXISTING_TYPE" != "hash:net" ]; then
+EXISTING_TYPE=$(ipset list "$IPSET_NAME" -terse 2>/dev/null | grep Type | cut -d: -f2 | tr -d " ")
+if [ -n "$EXISTING_TYPE" ] && [ "$EXISTING_TYPE" != "hash:net" ]; then
     # 若类型不匹配，先删除引用它的 iptables 规则才能销毁
-    iptables -D INPUT -m set --match-set "\$IPSET_NAME" src -j ACCEPT -m comment --comment "#ssh-security" 2>/dev/null
-    ipset destroy "\$IPSET_NAME" 2>/dev/null
+    iptables -D INPUT -m set --match-set "$IPSET_NAME" src -j ACCEPT -m comment --comment "#ssh-security" 2>/dev/null
+    ipset destroy "$IPSET_NAME" 2>/dev/null
 fi
 
-ipset create "\$IPSET_NAME" hash:net -exist
-ipset create "\${IPSET_NAME}_tmp" hash:net -exist
-ipset flush "\${IPSET_NAME}_tmp"
-for ip in \$IPS; do
-    ipset add "\${IPSET_NAME}_tmp" "\$ip" -exist
+ipset create "$IPSET_NAME" hash:net -exist
+ipset create "${IPSET_NAME}_tmp" hash:net -exist
+ipset flush "${IPSET_NAME}_tmp"
+for ip in $IPS; do
+    ipset add "${IPSET_NAME}_tmp" "$ip" -exist
 done
-ipset swap "\${IPSET_NAME}_tmp" "\$IPSET_NAME"
-ipset destroy "\${IPSET_NAME}_tmp"
+ipset swap "${IPSET_NAME}_tmp" "$IPSET_NAME"
+ipset destroy "${IPSET_NAME}_tmp"
 
 # 5. 重构 Iptables 链
 # 清理旧规则
 iptables -S INPUT | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null
 
 # Level 1: 置顶白名单 ACCEPT
-iptables -I INPUT 1 -m set --match-set "\$IPSET_NAME" src -j ACCEPT -m comment --comment "#ssh-security"
+iptables -I INPUT 1 -m set --match-set "$IPSET_NAME" src -j ACCEPT -m comment --comment "#ssh-security"
 
 # Level 2: 只有在确定有白名单 IP 的情况下才开启 DROP
 iptables -I INPUT 2 -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
 
-echo "[$(date)] 同步成功。有效 IP 数量: \$(echo "\$IPS" | wc -l)"
+echo "[$(date)] 同步成功。有效 IP 数量: $(echo "$IPS" | wc -l)"
 EOF
 
 chmod +x "$SYNC_SCRIPT"
