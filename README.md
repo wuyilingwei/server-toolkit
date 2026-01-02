@@ -135,7 +135,7 @@ sudo server-toolkit
 SYS_DEVICE_UUID="your-device-uuid-here"
 
 # Vault API URL
-SYS_VAULT_URL="https://vault.wuyilingwei.com/api/data"
+SYS_VAULT_URL="https://your-vault-url.com/api/data"
 
 # 工具包安装目录
 SYS_TOOLKIT_DIR="/srv/server-toolkit"
@@ -222,7 +222,7 @@ sudo server-toolkit
 
 ### API 端点
 
-默认使用：`https://vault.wuyilingwei.com/api/data`
+请配置您的 Vault API 端点地址
 
 可通过 `SYS_VAULT_URL` 环境变量自定义。
 
@@ -235,7 +235,7 @@ sudo server-toolkit
 获取操作列表：
 
 ```bash
-curl -X POST "https://vault.wuyilingwei.com/api/data" \
+curl -X POST "https://your-vault-url.com/api/data" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_DEVICE_UUID" \
   -d '{
@@ -279,7 +279,7 @@ curl -X POST "https://vault.wuyilingwei.com/api/data" \
 
 [配置信息]
   设备 UUID: abc123-def456-ghi789
-  Vault URL: https://vault.wuyilingwei.com/api/data
+  Vault URL: https://your-vault-url.com/api/data
   安装目录: /srv/server-toolkit
   配置版本: v1.0.0
 

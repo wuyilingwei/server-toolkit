@@ -12,7 +12,6 @@ STORAGE_DIR="$INSTALL_DIR/storage"
 BIN_LINK="/usr/local/bin/server-toolkit"
 REPO_URL="https://github.com/wuyilingwei/server-toolkit"
 RAW_REPO_URL="https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main"
-DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
 
 # Color codes
 COLOR_RESET="\033[0m"
@@ -75,7 +74,7 @@ get_device_uuid() {
 }
 
 get_vault_url() {
-    get_config_value "SYS_VAULT_URL" "$DEFAULT_VAULT_URL"
+    get_config_value "SYS_VAULT_URL" "未配置"
 }
 
 main() {
@@ -223,16 +222,17 @@ log_info "配置 Vault URL"
 current_vault_url=$(get_vault_url)
 log_info "当前 Vault URL: $current_vault_url"
 
-if [ "$current_vault_url" != "$DEFAULT_VAULT_URL" ]; then
+if [ "$current_vault_url" != "未配置" ]; then
     log_success "Vault URL 已配置为: $current_vault_url，跳过配置"
 else
-    echo -n "请输入 Vault URL (默认: $DEFAULT_VAULT_URL): "
+    echo -n "请输入 Vault URL: "
     read custom_url
 
     if [ -n "$custom_url" ]; then
         set_config_value "SYS_VAULT_URL" "$custom_url"
     else
-        set_config_value "SYS_VAULT_URL" "$DEFAULT_VAULT_URL"
+        log_error "未输入 Vault URL，部署中止"
+        exit 1
     fi
     log_success "Vault URL 已设置: $(get_vault_url)"
 fi
@@ -242,7 +242,7 @@ if [ "$(get_device_uuid)" = "未配置" ]; then
     echo ""
     log_info "配置设备 UUID"
     echo -n "请输入设备 UUID (用于 Vault 认证): "
-    read -s device_uuid
+    read device_uuid
     echo ""
     
     if [ -n "$device_uuid" ]; then

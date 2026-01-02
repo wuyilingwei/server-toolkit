@@ -20,7 +20,6 @@ CONFIG_VERSION="1.1.0"
 TOOLKIT_REPO="https://github.com/wuyilingwei/server-toolkit"
 RAW_REPO_URL="https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main"
 DEFAULT_INSTALL_DIR="/srv/server-toolkit"
-DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
 
 # ANSI Color Codes
 COLOR_RESET="\033[0m"
@@ -87,7 +86,7 @@ get_device_uuid() {
 
 # 获取 Vault URL
 get_vault_url() {
-    get_config_value "SYS_VAULT_URL" "$DEFAULT_VAULT_URL"
+    get_config_value "SYS_VAULT_URL" "未配置"
 }
 
 # 获取安装目录

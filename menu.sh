@@ -148,7 +148,7 @@ configure_device_uuid() {
     fi
     
     echo -n "请输入新的设备 UUID: "
-    read -s new_uuid
+    read new_uuid
     echo ""
     
     if [ -n "$new_uuid" ]; then

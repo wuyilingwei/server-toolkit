@@ -15,7 +15,6 @@ fi
 # ====================================
 
 # Default Configuration
-DEFAULT_VAULT_URL="https://vault.wuyilingwei.com/api/data"
 # Storage directory for persistent data
 STORAGE_DIR="$WORKDIR/cert"
 CERT_LOCAL_DIR="$STORAGE_DIR/local"
@@ -50,7 +49,7 @@ if [ -z "$SYS_DEVICE_UUID" ]; then
     echo ""
     echo -e "${COLOR_YELLOW}未检测到设备 UUID (SYS_DEVICE_UUID)${COLOR_RESET}"
     echo -n "请输入您的 Vault Token (UUID): "
-    read -s user_token
+    read user_token
     echo ""
     
     if [ -n "$user_token" ]; then
@@ -70,11 +69,9 @@ fi
 
 # Check/Prompt for Vault URL
 if [ -z "$SYS_VAULT_URL" ]; then
-    SYS_VAULT_URL="$DEFAULT_VAULT_URL"
-    if ! grep -q "SYS_VAULT_URL" /etc/environment; then
-        echo "SYS_VAULT_URL=\"$SYS_VAULT_URL\"" >> /etc/environment
-    fi
-    export SYS_VAULT_URL
+    echo -e "${COLOR_RED}错误: SYS_VAULT_URL 未配置。请使用以下命令配置:${COLOR_RESET}"
+    echo -e "${COLOR_YELLOW}echo 'SYS_VAULT_URL=\"https://your-vault-url.com/api/data\"' >> /etc/environment${COLOR_RESET}"
+    exit 1
 fi
 
 # Ask about cert/local directory permissions

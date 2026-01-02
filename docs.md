@@ -35,14 +35,18 @@ Server Toolkit 是一个模块化的服务器管理工具包，提供统一的�
 ### 核心组件
 
 #### menu.sh
+
 交互式菜单主程序，提供：
+
 - 系统信息展示（网络、资源、配置）
 - 保留操作菜单（0-9）
 - 模块操作菜单（10+）
 - 工具包自更新功能
 
 #### helper.sh
+
 配置和工具函数库，包含：
+
 - 环境变量管理（/etc/environment）
 - 系统信息获取函数
 - 版本比较和更新检查
@@ -50,20 +54,26 @@ Server Toolkit 是一个模块化的服务器管理工具包，提供统一的�
 - 日志输出函数
 
 #### config.json
+
 模块和菜单的元数据配置：
+
 - 版本信息
 - 模块列表和配置
 - 菜单 ID 映射
 - 模块依赖关系
 
 #### scripts/
+
 Git 克隆的仓库目录，包含所有模块脚本：
+
 - 从远程仓库自动克隆
 - 支持自动更新
 - 模块脚本按功能分类
 
 #### storage/
+
 持久化任务数据目录：
+
 - 每个需要持久化的模块有独立子目录
 - 存储模块运行时生成的数据
 - 存储定时任务脚本和日志
@@ -86,32 +96,33 @@ wget -qO- https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/depl
 ### 部署流程
 
 1. **检测并安装依赖**
+
    - curl
    - jq
    - git
    - procps
-
 2. **克隆仓库**
+
    - 克隆完整仓库到 `/srv/server-toolkit/scripts`
    - 强制克隆（如果目录存在则删除重新克隆）
-
 3. **复制核心文件**
+
    - 从 scripts/ 复制核心文件到主目录
    - menu.sh
    - config.json
    - helper.sh
-
 4. **创建目录结构**
+
    - 创建 `/srv/server-toolkit/storage` 目录
    - 创建各模块的持久化子目录
-
 5. **配置环境变量**
+
    - SYS_TOOLKIT_DIR: `/srv/server-toolkit`
    - SYS_TOOLKIT_REPO: 仓库 URL
    - SYS_VAULT_URL: Vault API 地址
    - SYS_DEVICE_UUID: 设备认证 UUID
-
 6. **创建系统命令**
+
    - 创建 `/usr/local/bin/server-toolkit` 命令
    - 设置执行权限
 
@@ -119,29 +130,30 @@ wget -qO- https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/depl
 
 ### 保留操作（0-9）
 
-| 编号 | 功能 | 说明 |
-|------|------|------|
-| 0 | 退出 | 退出工具包 |
-| 1 | 配置 Vault URL | 设置 Vault API 地址 |
-| 2 | 配置设备 UUID | 设置设备认证令牌 |
-| 3 | 工具包自更新 | 更新核心组件和模块 |
-| 4 | 更新模块 | 查看和更新已安装模块 |
-| 5 | 显示当前配置 | 显示系统配置和已安装模块 |
-| 6-9 | 保留待用 | 预留给未来功能 |
+| 编号 | 功能           | 说明                     |
+| ---- | -------------- | ------------------------ |
+| 0    | 退出           | 退出工具包               |
+| 1    | 配置 Vault URL | 设置 Vault API 地址      |
+| 2    | 配置设备 UUID  | 设置设备认证令牌         |
+| 3    | 工具包自更新   | 更新核心组件和模块       |
+| 4    | 更新模块       | 查看和更新已安装模块     |
+| 5    | 显示当前配置   | 显示系统配置和已安装模块 |
+| 6-9  | 保留待用       | 预留给未来功能           |
 
 ### 模块操作（10+）
 
-| 编号 | 模块 | 功能 |
-|------|------|------|
-| 10 | SSH 安全防护 | 基于 Vault 白名单的 SSH 防护系统 |
-| 11 | 证书同步 | 从 Vault 同步 SSL 证书 |
-| 12 | 系统 Swap 管理 | 创建和调整 Swap 交换区 |
+| 编号 | 模块           | 功能                             |
+| ---- | -------------- | -------------------------------- |
+| 10   | SSH 安全防护   | 基于 Vault 白名单的 SSH 防护系统 |
+| 11   | 证书同步       | 从 Vault 同步 SSL 证书           |
+| 12   | 系统 Swap 管理 | 创建和调整 Swap 交换区           |
 
 ## 功能模块
 
 ### SSH 安全防护模块
 
 **功能特性：**
+
 - 基于 IPSET 的白名单防护
 - 从 Vault API 动态获取白名单
 - 熔断保护机制（API 失败时自动解除拦截）
@@ -149,10 +161,12 @@ wget -qO- https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/depl
 - 多层级防护策略
 
 **持久化数据：**
+
 - 路径：`/srv/server-toolkit/storage/ssh-security/`
 - 内容：同步脚本、日志文件
 
 **使用方法：**
+
 ```bash
 sudo server-toolkit
 # 选择 [10] SSH 安全防护部署
@@ -161,6 +175,7 @@ sudo server-toolkit
 ### 证书同步模块
 
 **功能特性：**
+
 - 从 Vault API 列出所有可用证书密钥
 - 支持选择性同步生产证书（cert, fullchain, privkey）
 - 支持选择性同步 CloudFlare Origin 证书（cf-cert, cf-privkey）
@@ -171,6 +186,7 @@ sudo server-toolkit
 - 定时任务自动维护符号链接
 
 **持久化数据：**
+
 - 路径：`/srv/server-toolkit/cert/`
 - 内容：同步配置、工作脚本、日志文件
 - 证书存储：`/srv/server-toolkit/cert/local/`
@@ -179,6 +195,7 @@ sudo server-toolkit
 - 符号链接：可选创建到 `/etc/ssl` 和 `/etc/nginx/ssl`（由工作脚本维护）
 
 **使用方法：**
+
 ```bash
 sudo server-toolkit
 # 选择 [11] 证书同步管理
@@ -187,12 +204,14 @@ sudo server-toolkit
 ### 系统 Swap 管理模块
 
 **功能特性：**
+
 - 创建和调整 Swap 交换区
 - 配置 Swappiness 参数
 - 自动持久化到 /etc/fstab
 - 交互式配置引导
 
 **使用方法：**
+
 ```bash
 sudo server-toolkit
 # 选择 [12] 系统 Swap 管理
@@ -209,7 +228,7 @@ sudo server-toolkit
 SYS_DEVICE_UUID="your-device-uuid-here"
 
 # Vault API URL
-SYS_VAULT_URL="https://vault.wuyilingwei.com/api/data"
+SYS_VAULT_URL="https://vault.example.com/api/data"
 
 # 工具包安装目录
 SYS_TOOLKIT_DIR="/srv/server-toolkit"
@@ -227,6 +246,7 @@ SYS_TOOLKIT_REPO="https://github.com/wuyilingwei/server-toolkit"
 ### 配置函数
 
 在 helper.sh 中提供的配置函数：
+
 - `get_config_value(key, default)` - 获取配置值
 - `set_config_value(key, value)` - 设置配置值
 - `get_device_uuid()` - 获取设备 UUID
@@ -269,6 +289,7 @@ scripts/module-name/
 
 1. **工作目录保护**
    每个模块脚本必须包含工作目录保护代码：
+
    ```bash
    WORKDIR="/srv/server-toolkit"
    mkdir -p "$WORKDIR"
@@ -277,22 +298,22 @@ scripts/module-name/
        cd "$WORKDIR" || { echo "错误: 无法访问工作目录 $WORKDIR"; exit 1; }
    fi
    ```
-
 2. **使用 storage 目录**
    持久化数据应存储在 `storage/[module-id]/` 目录：
+
    ```bash
    STORAGE_DIR="/srv/server-toolkit/storage/module-id"
    mkdir -p "$STORAGE_DIR"
    ```
-
 3. **环境变量**
    加载系统环境变量：
+
    ```bash
    source /etc/environment
    ```
-
 4. **日志记录**
    使用统一的日志格式：
+
    ```bash
    log() {
        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
@@ -305,6 +326,7 @@ scripts/module-name/
 
 1. **创建 worker 脚本**
    在 storage 目录下创建持久化脚本：
+
    ```bash
    WORKER_SCRIPT="$STORAGE_DIR/worker.sh"
    cat > "$WORKER_SCRIPT" << 'EOF'
@@ -313,9 +335,9 @@ scripts/module-name/
    EOF
    chmod +x "$WORKER_SCRIPT"
    ```
-
 2. **配置 Crontab**
    使用标签管理 cron 任务：
+
    ```bash
    TAG="#st-module-id"
    CRON_CMD="*/10 * * * * $WORKER_SCRIPT >> $LOG_FILE 2>&1 $TAG"
@@ -324,9 +346,9 @@ scripts/module-name/
    crontab /tmp/cron.tmp
    rm /tmp/cron.tmp
    ```
-
 3. **清理旧任务**
    使用唯一标签避免重复任务：
+
    ```bash
    crontab -l 2>/dev/null | grep -v "$TAG" > /tmp/cron.tmp
    ```
@@ -335,7 +357,7 @@ scripts/module-name/
 
 ### API 端点
 
-默认端点：`https://vault.wuyilingwei.com/api/data`
+请配置您的 Vault API 端点地址
 
 可通过 `SYS_VAULT_URL` 环境变量自定义。
 
@@ -394,6 +416,7 @@ vault_api_call '{"ops": [...]}'
 ### 模块更新
 
 模块随工具包一起更新：
+
 - Git 仓库更新会同时更新所有模块脚本
 - 持久化数据保存在 storage/ 目录，不受更新影响
 - 重新执行模块会应用最新脚本
@@ -411,21 +434,22 @@ vault_api_call '{"ops": [...]}'
 ## 安全注意事项
 
 1. **保护敏感信息**
+
    - 妥善保管 `SYS_DEVICE_UUID`
    - 不要在日志中输出完整 UUID
    - 使用 HTTPS 连接 Vault API
-
 2. **权限管理**
+
    - 工具包需要 root 权限运行
    - 证书文件权限设置为 600
    - Storage 目录权限适当限制
-
 3. **SSH 安全**
+
    - 部署前确保有备用管理入口
    - 熔断机制避免锁死服务器
    - 定期备份白名单配置
-
 4. **备份建议**
+
    - 定期备份 `/etc/environment`
    - 备份 `/srv/server-toolkit/storage/` 持久化数据
    - 记录重要的配置变更
@@ -470,20 +494,24 @@ vault_api_call '{"ops": [...]}'
 ## 日志文件
 
 ### SSH 安全同步日志
+
 - 位置：`/srv/server-toolkit/storage/ssh-security/sync.log`
 - 查看：`tail -f /srv/server-toolkit/storage/ssh-security/sync.log`
 
 ### 证书同步日志
+
 - 位置：`/srv/server-toolkit/cert/sync.log`
 - 查看：`tail -f /srv/server-toolkit/cert/sync.log`
 
 ### 系统日志
+
 - Cron 日志：`/var/log/syslog` 或 `/var/log/cron`
 - 查看：`grep server-toolkit /var/log/syslog`
 
 ## 版本历史
 
 ### v1.1.0 (当前)
+
 - ✨ 重构目录结构
 - ✨ 使用 Git 克隆方式部署
 - ✨ 引入 storage 目录管理持久化数据
@@ -491,6 +519,7 @@ vault_api_call '{"ops": [...]}'
 - ✨ 改进模块管理机制
 
 ### v1.0.0
+
 - ✨ 初始版本发布
 - ✨ 模块化架构设计
 - ✨ 自动更新机制
