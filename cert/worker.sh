@@ -175,13 +175,22 @@ if [ "$CREATE_NGINX_SSL" = "true" ]; then
     create_symlink "$CERT_DIR/nginx-cert.pem" "/etc/nginx/ssl/nginx-cert.pem"
 fi
 
-# Custom command after updates
+# Custom command after updates (configurable)
+CUSTOM_COMMAND=""
+
 custom_command() {
-    log "执行自定义命令: $1"
-    eval "$1"
+    if [ -n "$CUSTOM_COMMAND" ]; then
+        log "执行自定义命令: $CUSTOM_COMMAND"
+        eval "$CUSTOM_COMMAND"
+    else
+        log "未配置自定义命令，跳过执行"
+    fi
 }
 
-# Example: Reload nginx after updates
-custom_command "systemctl reload nginx"
+# Example: Uncomment and set CUSTOM_COMMAND to reload nginx after updates
+# CUSTOM_COMMAND="systemctl reload nginx"
+
+# Call custom_command at the end of the script
+custom_command
 
 log "同步任务完成"
