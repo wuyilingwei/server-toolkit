@@ -242,6 +242,7 @@ log() {
 }
 
 # Ensure cert directory exists with correct permissions
+# Note: 700 permissions are required for security (owner read/write/execute only)
 mkdir -p "$CERT_DIR"
 chmod 700 "$CERT_DIR"
 
@@ -366,11 +367,11 @@ chmod +x "$SYNC_SCRIPT_PATH"
 
 # 7. Setup Cron Job with #server-toolkit-cert tag
 log_info "配置定时任务 (每小时执行一次)..."
-TAG="#server-toolkit-cert"
+TAG="# server-toolkit-cert"
 CRON_CMD="0 * * * * $SYNC_SCRIPT_PATH >> $LOG_FILE 2>&1 $TAG"
 
-# Remove all old cert jobs (with #server-toolkit-cert tag)
-crontab -l 2>/dev/null | grep -v "$TAG" > /tmp/cron.tmp || true
+# Remove all old cert jobs (with server-toolkit-cert tag)
+crontab -l 2>/dev/null | grep -v "server-toolkit-cert" > /tmp/cron.tmp || true
 
 # Add new job
 echo "$CRON_CMD" >> /tmp/cron.tmp
