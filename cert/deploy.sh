@@ -169,12 +169,12 @@ while IFS= read -r domain; do
     fi
     
     if [ -n "$prod_certs" ]; then
-        echo "    生产证书: ${COLOR_GREEN}${prod_certs}${COLOR_RESET}"
+        echo "    生产证书: ${prod_certs}"
         prod_available[$i]="true"
     fi
     
     if [ -n "$cf_certs" ]; then
-        echo "    源站证书: ${COLOR_YELLOW}${cf_certs}${COLOR_RESET}"
+        echo "    源站证书: ${cf_certs}"
         cf_available[$i]="true"
     fi
     
