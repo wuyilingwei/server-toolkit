@@ -2,7 +2,7 @@
 # SSH Security Worker Script - Persistent Security Synchronization
 # This script handles ongoing IP whitelist synchronization
 
-source /etc/environment
+. /etc/environment
 
 # Check configuration
 if [ -z "$SYS_VAULT_URL" ]; then

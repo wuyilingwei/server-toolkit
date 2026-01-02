@@ -103,10 +103,14 @@ echo -e "${COLOR_GREEN}========================================${COLOR_RESET}"
 
 # 6. 交互式卸载 Fail2ban
 echo -e "\n${COLOR_BLUE}可选操作: 清理旧策略${COLOR_RESET}"
-read -p "是否需要直接卸载 Fail2ban 以清理旧策略? (y/n): " confirm
-if [ "$confirm" = "y" ]; then
-    apt purge fail2ban -y && apt autoremove -y
-    echo -e "${COLOR_GREEN}Fail2ban 已卸载${COLOR_RESET}"
+if dpkg -l | grep -q fail2ban; then
+    read -p "检测到 Fail2ban 已安装，是否需要卸载以清理旧策略? (y/n): " confirm
+    if [ "$confirm" = "y" ]; then
+        apt purge fail2ban -y && apt autoremove -y
+        echo -e "${COLOR_GREEN}Fail2ban 已卸载${COLOR_RESET}"
+    else
+        echo -e "${COLOR_YELLOW}已跳过卸载${COLOR_RESET}"
+    fi
 else
-    echo -e "${COLOR_YELLOW}已跳过卸载${COLOR_RESET}"
+    echo -e "${COLOR_YELLOW}未检测到 Fail2ban，跳过卸载${COLOR_RESET}"
 fi
