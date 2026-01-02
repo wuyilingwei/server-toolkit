@@ -27,8 +27,9 @@ server-toolkit/
 ├── docs.md                # 详细文档
 ├── ssh-security/          # SSH 安全模块
 │   └── deploy.sh
-├── cert-sync/             # 证书同步模块
-│   └── deploy.sh
+├── cert/                  # 证书同步模块
+│   ├── deploy.sh         # 部署和配置脚本
+│   └── worker.sh         # 定时同步工作脚本
 └── system/                # 系统维护模块
     └── swap.sh
 ```
@@ -44,12 +45,12 @@ server-toolkit/
 ├── helper.sh              # 配置和工具函数库
 ├── scripts/               # Git 克隆的仓库目录
 │   ├── ssh-security/     # SSH 安全模块
-│   ├── cert-sync/        # 证书同步模块
+│   ├── cert/             # 证书同步模块
 │   ├── system/           # 系统维护模块
 │   └── [其他模块]        # 其他模块脚本
 └── storage/               # 持久化任务数据目录
     ├── ssh-security/     # SSH 安全模块数据
-    ├── cert-sync/        # 证书同步模块数据
+    ├── cert/             # 证书同步模块数据
     └── [其他模块]        # 其他模块的持久化数据
 ```
 
@@ -331,12 +332,12 @@ tail -f /srv/server-toolkit/storage/ssh-security/sync.log
 
 ### 证书同步日志
 
-位置：`/srv/server-toolkit/storage/cert-sync/sync.log`
+位置：`/srv/server-toolkit/cert/sync.log`
 
 查看日志：
 
 ```bash
-tail -f /srv/server-toolkit/storage/cert-sync/sync.log
+tail -f /srv/server-toolkit/cert/sync.log
 ```
 
 ## 安全注意事项

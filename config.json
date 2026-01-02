@@ -14,10 +14,10 @@
       "version": "1.0.0"
     },
     {
-      "id": "cert-sync",
+      "id": "cert",
       "name": "证书同步管理",
       "description": "从 Vault 同步 SSL 证书 (Standard/CF Origin)",
-      "script": "cert-sync/deploy.sh",
+      "script": "cert/deploy.sh",
       "min_config_version": "1.0.0",
       "menu_id": 11,
       "enabled": true,
