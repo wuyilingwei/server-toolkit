@@ -158,6 +158,18 @@ version_ge() {
     return $?
 }
 
+# 获取当前代码版本Hash
+get_current_hash() {
+    local install_dir=$(get_install_dir)
+    local scripts_dir="$install_dir/scripts"
+    
+    if [ -d "$scripts_dir/.git" ]; then
+        cd "$scripts_dir" && git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+    else
+        echo "no-git"
+    fi
+}
+
 # 检查远程是否有更新
 check_remote_update() {
     local install_dir=$(get_install_dir)

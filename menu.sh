@@ -107,11 +107,15 @@ do_self_update() {
     log_info "重新加载配置..."
     source "$install_dir/helper.sh"
     
+    # 重新读取更新后的配置
+    local updated_config=$(read_repo_config)
+    local updated_version=$(echo "$updated_config" | jq -r '.version // "0.0.0"')
+    
     # 检查版本是否有变化
-    if version_ge "$local_version" "$remote_version" && [ "$local_version" = "$remote_version" ]; then
+    if version_ge "$local_version" "$updated_version" && [ "$local_version" = "$updated_version" ]; then
         log_success "已是最新版本"
     else
-        log_success "更新完成！新版本: v$remote_version"
+        log_success "更新完成！新版本: v$updated_version"
     fi
     
     return 0
@@ -246,8 +250,12 @@ execute_module() {
 # 显示菜单
 show_menu() {
     local config="$1"
+    local current_version=$(echo "$config" | jq -r '.version // "1.0.0"')
+    local current_hash=$(get_current_hash)
     
     echo -e "${COLOR_CYAN}==================== 操作菜单 ====================${COLOR_RESET}"
+    echo -e "${COLOR_BLUE}当前版本: v$current_version ($current_hash)${COLOR_RESET}"
+    echo ""
     
     # 保留操作 (1-9)
     echo -e "${COLOR_YELLOW}[1]${COLOR_RESET} 配置 Vault URL"
@@ -301,6 +309,7 @@ show_menu() {
 # 主循环
 main_loop() {
     local HAS_UPDATE=false
+    local AUTO_UPDATE_DONE=false
     
     # 读取配置
     local config=$(read_repo_config)
@@ -315,8 +324,23 @@ main_loop() {
         exit 1
     fi
     
-    # 检查更新（静默）
-    check_remote_update &>/dev/null && HAS_UPDATE=true || HAS_UPDATE=false
+    # 自动检查更新（首次启动时）
+    if [ "$AUTO_UPDATE_DONE" = "false" ]; then
+        log_info "检查工具包更新..."
+        if check_remote_update; then
+            log_info "发现新版本！正在自动更新..."
+            if do_self_update; then
+                log_success "更新完成，正在重启菜单..."
+                exec "$0" "$@"  # 重新执行脚本
+            else
+                log_error "自动更新失败，将继续使用当前版本"
+                HAS_UPDATE=true
+            fi
+        else
+            log_info "当前已是最新版本"
+        fi
+        AUTO_UPDATE_DONE=true
+    fi
     
     while true; do
         echo ""
@@ -351,9 +375,12 @@ main_loop() {
                 configure_device_uuid
                 ;;
             3)
-                do_self_update && HAS_UPDATE=false
-                # 重新加载配置
-                config=$(read_repo_config)
+                if do_self_update; then
+                    log_success "更新完成，正在重启菜单..."
+                    exec "$0" "$@"  # 重新执行脚本以载入新配置
+                else
+                    log_error "更新失败"
+                fi
                 ;;
             4)
                 show_current_config
