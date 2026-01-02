@@ -73,7 +73,7 @@ WORKER_SCRIPT="$STORAGE_DIR/worker.sh"
 LOG_FILE="$STORAGE_DIR/sync.log"
 
 # 复制 worker 脚本模板到 storage 目录
-cp "$WORKDIR/ssh-security/worker.sh" "$WORKER_SCRIPT"
+cp "$WORKDIR/scripts/ssh-security/worker.sh" "$WORKER_SCRIPT"
 chmod +x "$WORKER_SCRIPT"
 
 echo -e "${COLOR_GREEN}✓ Worker 脚本已部署到: $WORKER_SCRIPT${COLOR_RESET}"
