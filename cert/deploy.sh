@@ -455,12 +455,6 @@ fi
 
 echo "$CONFIG_JSON" | jq '.' > "$CONFIG_FILE"
 
-log_success "配置已保存到: $CONFIG_FILE"
-echo ""
-echo "配置内容:"
-cat "$CONFIG_FILE"
-echo ""
-
 # 7. Deploy Worker Script
 log_info "部署同步脚本: $SYNC_SCRIPT_PATH"
 
@@ -523,6 +517,13 @@ elif [ -n "$reload_cmd" ]; then
 else
     log_warning "未设置重载命令，证书更新后不会自动重载服务"
 fi
+
+# 更新配置文件
+log_success "配置已保存到: $CONFIG_FILE"
+echo ""
+echo "配置内容:"
+cat "$CONFIG_FILE"
+echo ""
 
 # 11. Run Initial Sync
 log_info "正在执行首次同步..."
