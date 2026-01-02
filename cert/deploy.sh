@@ -100,23 +100,22 @@ RESPONSE=$(curl -s -m 10 -X POST "$SYS_VAULT_URL" \
     -H "Authorization: Bearer $SYS_DEVICE_UUID" \
     -d '{"ops": [{"id": "list_certs", "type": "list", "module": "certs"}]}')
 
-# Check for errors safely - handle potential \n in response
+# Check for errors safely - handle potential control characters in response
 if [ -z "$RESPONSE" ]; then
     log_error "获取列表失败: 空响应"
     exit 1
 fi
 
-# Fix JSON by replacing literal \n sequences with actual newlines, then minify for parsing
-CLEAN_RESPONSE=$(echo "$RESPONSE" | sed 's/\\n/\n/g' | jq -c '.')
-
-if ! echo "$CLEAN_RESPONSE" | jq -e '.[0].status == 200' >/dev/null 2>&1; then
-    ERR_MSG=$(echo "$CLEAN_RESPONSE" | jq -r 'if type=="array" then .[0].error // .[0].message else .error // .message end // "Unknown error"' 2>/dev/null)
-    log_error "获取列表失败: ${ERR_MSG:-Response format error}"
+# Validate and parse JSON response directly without modifying control characters
+# jq can handle properly escaped \n in JSON strings
+if ! echo "$RESPONSE" | jq -e '.[0].status == 200' >/dev/null 2>&1; then
+    ERR_MSG=$(echo "$RESPONSE" | jq -r 'if type=="array" then .[0].error // .[0].message else .error // .message end // "Unknown error"' 2>/dev/null) || ERR_MSG="Response format error"
+    log_error "获取列表失败: ${ERR_MSG}"
     exit 1
 fi
 
 # Parse keys from list response
-ALL_KEYS=$(echo "$CLEAN_RESPONSE" | jq -r '.[0].data[] | .key' 2>/dev/null)
+ALL_KEYS=$(echo "$RESPONSE" | jq -r '.[0].data[] | .key' 2>/dev/null)
 
 if [ -z "$ALL_KEYS" ]; then
     log_error "未找到任何证书密钥"
