@@ -25,7 +25,8 @@ Server Toolkit 是一个模块化的服务器管理工具包，提供统一的�
     ├── ssh-security/            # SSH 安全模块
     │   └── deploy.sh
     ├── cert/                    # 证书同步模块
-    │   └── deploy.sh
+    │   ├── deploy.sh           # 部署和配置脚本
+    │   └── worker.sh           # 定时同步工作脚本模板
     ├── system/                  # 系统维护模块
     │   └── swap.sh
     └── [其他模块]/              # 其他模块脚本
@@ -172,6 +173,7 @@ sudo server-toolkit
 - 内容：同步配置、工作脚本、日志文件
 - 证书存储：`/srv/server-toolkit/cert/local/`
 - 目录权限：建议 700（仅所有者可读写执行）
+- 工作脚本：从 `scripts/cert/worker.sh` 模板复制部署
 
 **使用方法：**
 ```bash

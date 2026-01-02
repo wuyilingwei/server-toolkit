@@ -28,7 +28,8 @@ server-toolkit/
 ├── ssh-security/          # SSH 安全模块
 │   └── deploy.sh
 ├── cert/                  # 证书同步模块
-│   └── deploy.sh
+│   ├── deploy.sh         # 部署和配置脚本
+│   └── worker.sh         # 定时同步工作脚本
 └── system/                # 系统维护模块
     └── swap.sh
 ```
