@@ -133,6 +133,8 @@ configure_vault_url() {
     
     if [ -n "$new_url" ]; then
         set_config_value "SYS_VAULT_URL" "$new_url"
+        # 重新加载环境变量
+        . /etc/environment 2>/dev/null || true
         log_success "Vault URL 已更新"
     else
         log_warning "未输入新 URL，保持原设置"
@@ -157,6 +159,8 @@ configure_device_uuid() {
     
     if [ -n "$new_uuid" ]; then
         set_config_value "SYS_DEVICE_UUID" "$new_uuid"
+        # 重新加载环境变量
+        . /etc/environment 2>/dev/null || true
         log_success "设备 UUID 已更新"
     else
         log_warning "未输入新 UUID，保持原设置"

@@ -23,9 +23,32 @@ echo "🚀 Install nginx..."
 sudo apt update
 sudo apt install -y nginx
 
-echo "🧹 Delete default site configuration..."
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo rm -f /etc/nginx/sites-available/default
+echo "📦 Backup existing site configuration..."
+# 创建备份目录
+BACKUP_DIR="/etc/nginx/backup/$(date +"%Y%m%d_%H%M%S")"
+sudo mkdir -p "$BACKUP_DIR"
+sudo chmod 755 "$BACKUP_DIR"
+
+# 备份现有配置文件
+BACKUP_COUNT=0
+if [ -f /etc/nginx/sites-available/default ]; then
+    sudo mv /etc/nginx/sites-available/default "$BACKUP_DIR/sites-available-default"
+    echo "✅ 已备份 sites-available/default 到 $BACKUP_DIR/"
+    BACKUP_COUNT=$((BACKUP_COUNT + 1))
+fi
+if [ -L /etc/nginx/sites-enabled/default ]; then
+    sudo rm /etc/nginx/sites-enabled/default
+    echo "✅ 已移除 sites-enabled/default 链接"
+fi
+
+if [ "$BACKUP_COUNT" -eq 0 ]; then
+    echo "ℹ️  没有找到需要备份的默认配置文件"
+    sudo rmdir "$BACKUP_DIR" 2>/dev/null || true
+else
+    echo "📁 备份完成，位置: $BACKUP_DIR"
+fi
+
+echo "🧹 Remove default site configuration (already backed up)..."
 
 echo "📁 Create default page directory under /etc/nginx/ ..."
 sudo mkdir -p /etc/nginx/default-site
