@@ -92,14 +92,7 @@ do_self_update() {
     log_info "当前版本: v$local_version"
     log_info "最新版本: v$remote_version"
     
-    # 检查是否需要更新
-    if version_ge "$local_version" "$remote_version"; then
-        log_success "已是最新版本"
-        cd "$install_dir"
-        return 0
-    fi
-    
-    # 复制核心文件
+    # 始终复制核心文件（即使版本号相同，文件内容可能已更新）
     log_info "提取核心文件..."
     cp "$scripts_dir/menu.sh" "$install_dir/"
     cp "$scripts_dir/config.json" "$install_dir/"
@@ -110,9 +103,17 @@ do_self_update() {
     
     cd "$install_dir"
     
-    log_success "更新完成！新版本: v$remote_version"
+    # 重新加载 helper 以使用最新函数定义
     log_info "重新加载配置..."
     source "$install_dir/helper.sh"
+    
+    # 检查版本是否有变化
+    if version_ge "$local_version" "$remote_version" && [ "$local_version" = "$remote_version" ]; then
+        log_success "已是最新版本"
+    else
+        log_success "更新完成！新版本: v$remote_version"
+    fi
+    
     return 0
 }
 
