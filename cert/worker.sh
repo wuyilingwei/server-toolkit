@@ -135,42 +135,53 @@ fi
 
 log "证书同步完成"
 
-# Create/maintain symbolic links
+# Create/maintain symbolic links for files
+create_symlink() {
+    local target_file="$1"
+    local link_path="$2"
+
+    # Ensure the parent directory of the link exists
+    local link_dir
+    link_dir=$(dirname "$link_path")
+    mkdir -p "$link_dir"
+
+    # Check if the target file exists
+    if [ ! -e "$target_file" ]; then
+        log "错误: 目标文件不存在: $target_file"
+        return
+    fi
+
+    # Handle existing link or file at the link path
+    if [ -L "$link_path" ]; then
+        rm -f "$link_path"
+    elif [ -e "$link_path" ]; then
+        log "警告: $link_path 已存在且不是符号链接，跳过创建"
+        return
+    fi
+
+    # Create the symbolic link
+    ln -sf "$target_file" "$link_path"
+    log "已创建符号链接: $link_path -> $target_file"
+}
+
+# Example usage of create_symlink
 if [ "$CREATE_ETC_SSL" = "true" ]; then
     log "维护 /etc/ssl 符号链接..."
-    # Remove old symlink if it exists
-    if [ -L /etc/ssl ]; then
-        rm -f /etc/ssl
-    elif [ -e /etc/ssl ]; then
-        log "警告: /etc/ssl 已存在且不是符号链接，跳过创建"
-    fi
-    
-    # Create new symlink if it doesn't exist or was just removed
-    if [ ! -e /etc/ssl ]; then
-        ln -sf "$CERT_DIR" /etc/ssl
-        log "已创建 /etc/ssl -> $CERT_DIR"
-    fi
+    create_symlink "$CERT_DIR/cert.pem" "/etc/ssl/cert.pem"
 fi
 
 if [ "$CREATE_NGINX_SSL" = "true" ]; then
     log "维护 /etc/nginx/ssl 符号链接..."
-    # Ensure /etc/nginx directory exists
-    if [ ! -d /etc/nginx ]; then
-        log "警告: /etc/nginx 目录不存在，跳过创建符号链接"
-    else
-        # Remove old symlink if it exists
-        if [ -L /etc/nginx/ssl ]; then
-            rm -f /etc/nginx/ssl
-        elif [ -e /etc/nginx/ssl ]; then
-            log "警告: /etc/nginx/ssl 已存在且不是符号链接，跳过创建"
-        fi
-        
-        # Create new symlink if it doesn't exist or was just removed
-        if [ ! -e /etc/nginx/ssl ]; then
-            ln -sf "$CERT_DIR" /etc/nginx/ssl
-            log "已创建 /etc/nginx/ssl -> $CERT_DIR"
-        fi
-    fi
+    create_symlink "$CERT_DIR/nginx-cert.pem" "/etc/nginx/ssl/nginx-cert.pem"
 fi
+
+# Custom command after updates
+custom_command() {
+    log "执行自定义命令: $1"
+    eval "$1"
+}
+
+# Example: Reload nginx after updates
+custom_command "systemctl reload nginx"
 
 log "同步任务完成"

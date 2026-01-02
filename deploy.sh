@@ -219,17 +219,23 @@ set_config_value "SYS_TOOLKIT_DIR" "$INSTALL_DIR"
 set_config_value "SYS_TOOLKIT_REPO" "https://github.com/wuyilingwei/server-toolkit"
 
 # Vault URL
-echo ""
 log_info "配置 Vault URL"
-echo -n "请输入 Vault URL (默认: $DEFAULT_VAULT_URL): "
-read custom_url
+current_vault_url=$(get_vault_url)
+log_info "当前 Vault URL: $current_vault_url"
 
-if [ -n "$custom_url" ]; then
-    set_config_value "SYS_VAULT_URL" "$custom_url"
+if [ "$current_vault_url" != "$DEFAULT_VAULT_URL" ]; then
+    log_success "Vault URL 已配置为: $current_vault_url，跳过配置"
 else
-    set_config_value "SYS_VAULT_URL" "$DEFAULT_VAULT_URL"
+    echo -n "请输入 Vault URL (默认: $DEFAULT_VAULT_URL): "
+    read custom_url
+
+    if [ -n "$custom_url" ]; then
+        set_config_value "SYS_VAULT_URL" "$custom_url"
+    else
+        set_config_value "SYS_VAULT_URL" "$DEFAULT_VAULT_URL"
+    fi
+    log_success "Vault URL 已设置: $(get_vault_url)"
 fi
-log_success "Vault URL 已设置: $(get_vault_url)"
 
 # 设备 UUID（如果未设置）
 if [ "$(get_device_uuid)" = "未配置" ]; then
