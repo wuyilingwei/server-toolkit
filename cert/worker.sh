@@ -32,16 +32,13 @@ CF_DOMAINS=$(echo "$CONFIG" | jq -r '.cf_origin[]' 2>/dev/null)
 CREATE_ETC_SSL=$(echo "$CONFIG" | jq -r '.symlinks.etc_ssl // false' 2>/dev/null)
 CREATE_NGINX_SSL=$(echo "$CONFIG" | jq -r '.symlinks.nginx_ssl // false' 2>/dev/null)
 
-# Function to fix JSON newlines and get value
+# Function to extract certificate value from JSON response
 get_cert_value() {
     local response="$1"
     local key="$2"
     
-    # Clean response by converting literal \n to actual newlines for proper JSON parsing
-    local clean_resp=$(echo "$response" | sed 's/\\n/\n/g' | jq -c '.')
-    
-    # Extract value and restore literal \n in certificate content
-    echo "$clean_resp" | jq -r --arg k "$key" \
+    # Extract value directly - jq -r automatically handles \n escape sequences
+    echo "$response" | jq -r --arg k "$key" \
         '.[0].data[] | select(.key == $k) | .value // empty'
 }
 
