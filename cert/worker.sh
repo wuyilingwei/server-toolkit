@@ -164,15 +164,45 @@ create_symlink() {
     log "已创建符号链接: $link_path -> $target_file"
 }
 
-# Example usage of create_symlink
+# Create/maintain symbolic links for all files in a directory
+create_symlinks_for_directory() {
+    local source_dir="$1"
+    local target_dir="$2"
+
+    # Ensure the target directory exists
+    mkdir -p "$target_dir"
+
+    # Iterate over all files in the source directory
+    for file in "$source_dir"/*; do
+        if [ -f "$file" ]; then
+            local filename
+            filename=$(basename "$file")
+            local link_path="$target_dir/$filename"
+
+            # Handle existing link or file at the link path
+            if [ -L "$link_path" ]; then
+                rm -f "$link_path"
+            elif [ -e "$link_path" ]; then
+                log "警告: $link_path 已存在且不是符号链接，跳过创建"
+                continue
+            fi
+
+            # Create the symbolic link
+            ln -sf "$file" "$link_path"
+            log "已创建符号链接: $link_path -> $file"
+        fi
+    done
+}
+
+# Example usage of create_symlinks_for_directory
 if [ "$CREATE_ETC_SSL" = "true" ]; then
     log "维护 /etc/ssl 符号链接..."
-    create_symlink "$CERT_DIR/cert.pem" "/etc/ssl/cert.pem"
+    create_symlinks_for_directory "$CERT_DIR" "/etc/ssl"
 fi
 
 if [ "$CREATE_NGINX_SSL" = "true" ]; then
     log "维护 /etc/nginx/ssl 符号链接..."
-    create_symlink "$CERT_DIR/nginx-cert.pem" "/etc/nginx/ssl/nginx-cert.pem"
+    create_symlinks_for_directory "$CERT_DIR" "/etc/nginx/ssl"
 fi
 
 # Custom command after updates (configurable)
