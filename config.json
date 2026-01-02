@@ -30,7 +30,40 @@
       "description": "创建、调整 Swap 交换区及 Swappiness 设置",
       "script": "system/swap.sh",
       "min_config_version": "1.0.0",
-      "menu_id": 12,
+      "menu_id": 21,
+      "enabled": true,
+      "needs_persistence": false,
+      "version": "1.0.0"
+    },
+    {
+      "id": "system-max-systemd",
+      "name": "systemd 日志优化",
+      "description": "清理和限制 systemd 日志大小，释放磁盘空间",
+      "script": "system/maxSystemd.sh",
+      "min_config_version": "1.0.0",
+      "menu_id": 22,
+      "enabled": true,
+      "needs_persistence": false,
+      "version": "1.0.0"
+    },
+    {
+      "id": "setup-nginx",
+      "name": "Nginx 部署安装",
+      "description": "安装 Nginx 网站服务器并配置默认页面",
+      "script": "setup/nginx.sh",
+      "min_config_version": "1.0.0",
+      "menu_id": 31,
+      "enabled": true,
+      "needs_persistence": false,
+      "version": "1.0.0"
+    },
+    {
+      "id": "setup-docker",
+      "name": "Docker 部署安装",
+      "description": "安装 Docker 容器引擎及相关工具",
+      "script": "setup/docker.sh",
+      "min_config_version": "1.0.0",
+      "menu_id": 32,
       "enabled": true,
       "needs_persistence": false,
       "version": "1.0.0"
