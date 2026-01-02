@@ -165,8 +165,10 @@ sudo server-toolkit
 - 支持选择性同步生产证书（cert, fullchain, privkey）
 - 支持选择性同步 CloudFlare Origin 证书（cf-cert, cf-privkey）
 - 定时自动同步（每小时）
-- 证书目录权限自动管理（可选设置为 600）
+- 证书目录权限自动管理（可选设置为 700）
 - 保持原有证书命名
+- 可选创建符号链接到 `/etc/ssl` 和 `/etc/nginx/ssl`
+- 定时任务自动维护符号链接
 
 **持久化数据：**
 - 路径：`/srv/server-toolkit/cert/`
@@ -174,6 +176,7 @@ sudo server-toolkit
 - 证书存储：`/srv/server-toolkit/cert/local/`
 - 目录权限：建议 700（仅所有者可读写执行）
 - 工作脚本：从 `scripts/cert/worker.sh` 模板复制部署
+- 符号链接：可选创建到 `/etc/ssl` 和 `/etc/nginx/ssl`（由工作脚本维护）
 
 **使用方法：**
 ```bash

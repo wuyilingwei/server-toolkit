@@ -28,6 +28,10 @@ CONFIG=$(cat "$CONFIG_FILE")
 PROD_DOMAINS=$(echo "$CONFIG" | jq -r '.production[]' 2>/dev/null)
 CF_DOMAINS=$(echo "$CONFIG" | jq -r '.cf_origin[]' 2>/dev/null)
 
+# Read symlink configuration
+CREATE_ETC_SSL=$(echo "$CONFIG" | jq -r '.symlinks.etc_ssl // false' 2>/dev/null)
+CREATE_NGINX_SSL=$(echo "$CONFIG" | jq -r '.symlinks.nginx_ssl // false' 2>/dev/null)
+
 # Function to fix JSON newlines and get value
 get_cert_value() {
     local response="$1"
@@ -133,3 +137,43 @@ if [ -n "$CF_DOMAINS" ]; then
 fi
 
 log "证书同步完成"
+
+# Create/maintain symbolic links
+if [ "$CREATE_ETC_SSL" = "true" ]; then
+    log "维护 /etc/ssl 符号链接..."
+    # Remove old symlink if it exists
+    if [ -L /etc/ssl ]; then
+        rm -f /etc/ssl
+    elif [ -e /etc/ssl ]; then
+        log "警告: /etc/ssl 已存在且不是符号链接，跳过创建"
+    fi
+    
+    # Create new symlink if it doesn't exist or was just removed
+    if [ ! -e /etc/ssl ]; then
+        ln -sf "$CERT_DIR" /etc/ssl
+        log "已创建 /etc/ssl -> $CERT_DIR"
+    fi
+fi
+
+if [ "$CREATE_NGINX_SSL" = "true" ]; then
+    log "维护 /etc/nginx/ssl 符号链接..."
+    # Ensure /etc/nginx directory exists
+    if [ ! -d /etc/nginx ]; then
+        log "警告: /etc/nginx 目录不存在，跳过创建符号链接"
+    else
+        # Remove old symlink if it exists
+        if [ -L /etc/nginx/ssl ]; then
+            rm -f /etc/nginx/ssl
+        elif [ -e /etc/nginx/ssl ]; then
+            log "警告: /etc/nginx/ssl 已存在且不是符号链接，跳过创建"
+        fi
+        
+        # Create new symlink if it doesn't exist or was just removed
+        if [ ! -e /etc/nginx/ssl ]; then
+            ln -sf "$CERT_DIR" /etc/nginx/ssl
+            log "已创建 /etc/nginx/ssl -> $CERT_DIR"
+        fi
+    fi
+fi
+
+log "同步任务完成"

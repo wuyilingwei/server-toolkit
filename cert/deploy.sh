@@ -194,11 +194,33 @@ if [ -z "$PROD_DOMAINS" ] && [ -z "$CF_DOMAINS" ]; then
     exit 1
 fi
 
-# 5. Generate Configuration File
+# 5. Ask about symbolic links
+echo ""
+echo -e "${COLOR_CYAN}=== 符号链接配置 ===${COLOR_RESET}"
+echo "可以创建符号链接到常用的证书目录，方便其他服务使用"
+echo ""
+
+echo -n "是否创建 /etc/ssl 符号链接? (y/n，默认: n): "
+read link_etc_ssl
+CREATE_ETC_SSL_LINK="false"
+if [ "$link_etc_ssl" = "y" ] || [ "$link_etc_ssl" = "Y" ]; then
+    CREATE_ETC_SSL_LINK="true"
+    log_success "将创建 /etc/ssl 符号链接"
+fi
+
+echo -n "是否创建 /etc/nginx/ssl 符号链接? (y/n，默认: n): "
+read link_nginx_ssl
+CREATE_NGINX_SSL_LINK="false"
+if [ "$link_nginx_ssl" = "y" ] || [ "$link_nginx_ssl" = "Y" ]; then
+    CREATE_NGINX_SSL_LINK="true"
+    log_success "将创建 /etc/nginx/ssl 符号链接"
+fi
+
+# 6. Generate Configuration File
 log_info "生成配置文件: $CONFIG_FILE"
 
 # Build JSON configuration
-CONFIG_JSON='{"production":[],"cf_origin":[]}'
+CONFIG_JSON='{"production":[],"cf_origin":[],"symlinks":{"etc_ssl":false,"nginx_ssl":false}}'
 
 if [ -n "$PROD_DOMAINS" ]; then
     while IFS= read -r domain; do
@@ -214,6 +236,12 @@ if [ -n "$CF_DOMAINS" ]; then
     done <<< "$CF_DOMAINS"
 fi
 
+# Add symlink configuration
+CONFIG_JSON=$(echo "$CONFIG_JSON" | jq \
+    --argjson etc_ssl "$CREATE_ETC_SSL_LINK" \
+    --argjson nginx_ssl "$CREATE_NGINX_SSL_LINK" \
+    '.symlinks.etc_ssl = $etc_ssl | .symlinks.nginx_ssl = $nginx_ssl')
+
 echo "$CONFIG_JSON" | jq '.' > "$CONFIG_FILE"
 
 log_success "配置已保存到: $CONFIG_FILE"
@@ -222,7 +250,7 @@ echo "配置内容:"
 cat "$CONFIG_FILE"
 echo ""
 
-# 6. Deploy Worker Script
+# 7. Deploy Worker Script
 log_info "部署同步脚本: $SYNC_SCRIPT_PATH"
 
 # Get the directory where deploy.sh is located (scripts directory in repo)
@@ -240,7 +268,7 @@ cp "$WORKER_TEMPLATE" "$SYNC_SCRIPT_PATH"
 
 chmod +x "$SYNC_SCRIPT_PATH"
 
-# 7. Setup Cron Job with #server-toolkit-cert tag
+# 8. Setup Cron Job with #server-toolkit-cert tag
 log_info "配置定时任务 (每小时执行一次)..."
 TAG="# server-toolkit-cert"
 CRON_CMD="0 * * * * $SYNC_SCRIPT_PATH >> $LOG_FILE 2>&1 $TAG"
@@ -255,7 +283,7 @@ rm /tmp/cron.tmp
 
 log_success "定时任务已配置"
 
-# 8. Run Initial Sync
+# 9. Run Initial Sync
 log_info "正在执行首次同步..."
 echo ""
 "$SYNC_SCRIPT_PATH"
