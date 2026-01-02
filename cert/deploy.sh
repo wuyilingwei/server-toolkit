@@ -109,7 +109,7 @@ fi
 # Validate and parse JSON response directly without modifying control characters
 # jq can handle properly escaped \n in JSON strings
 if ! echo "$RESPONSE" | jq -e '.[0].status == 200' >/dev/null 2>&1; then
-    ERR_MSG=$(echo "$RESPONSE" | jq -r 'if type=="array" then .[0].error // .[0].message else .error // .message end // "Unknown error"' 2>/dev/null || echo "Response format error")
+    ERR_MSG=$(echo "$RESPONSE" | jq -r 'if type=="array" then .[0].error // .[0].message else .error // .message end // "Unknown error"' 2>/dev/null) || ERR_MSG="Response format error"
     log_error "获取列表失败: ${ERR_MSG}"
     exit 1
 fi
