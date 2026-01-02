@@ -82,7 +82,7 @@ echo ""
 echo -e "${COLOR_CYAN}=== 证书目录权限设置 ===${COLOR_RESET}"
 echo "证书将存储在: $CERT_LOCAL_DIR"
 echo -e "${COLOR_YELLOW}建议设置目录权限为 700 (仅所有者可读写执行) 以保护证书安全${COLOR_RESET}"
-echo -n "是否设置 cert/local 目录权限为 700? (y/n，默认: y): "
+echo -n "是否设置 cert/local 目录权限为 700? (y/n，默认: y，Enter确认): "
 read set_perm
 
 if [ -z "$set_perm" ] || [ "$set_perm" = "y" ] || [ "$set_perm" = "Y" ]; then
@@ -199,7 +199,7 @@ echo -e "${COLOR_CYAN}=== 符号链接配置 ===${COLOR_RESET}"
 echo "可以创建符号链接到常用的证书目录，方便其他服务使用"
 echo ""
 
-echo -n "是否创建 /etc/ssl 符号链接? (y/n，默认: n): "
+echo -n "是否创建 /etc/ssl 符号链接? (y/n，默认: n，Enter确认): "
 read link_etc_ssl
 CREATE_ETC_SSL_LINK="false"
 if [ "$link_etc_ssl" = "y" ] || [ "$link_etc_ssl" = "Y" ]; then
@@ -207,7 +207,7 @@ if [ "$link_etc_ssl" = "y" ] || [ "$link_etc_ssl" = "Y" ]; then
     log_success "将创建 /etc/ssl 符号链接"
 fi
 
-echo -n "是否创建 /etc/nginx/ssl 符号链接? (y/n，默认: n): "
+echo -n "是否创建 /etc/nginx/ssl 符号链接? (y/n，默认: n，Enter确认): "
 read link_nginx_ssl
 CREATE_NGINX_SSL_LINK="false"
 if [ "$link_nginx_ssl" = "y" ] || [ "$link_nginx_ssl" = "Y" ]; then
@@ -282,7 +282,39 @@ rm /tmp/cron.tmp
 
 log_success "定时任务已配置"
 
-# 9. Run Initial Sync
+# 10. 配置自定义重载命令
+echo ""
+echo -e "${COLOR_CYAN}=== 服务重载命令配置 ===${COLOR_RESET}"
+
+# 从环境变量或配置文件读取当前命令
+current_reload_cmd=""
+if [ -f /etc/environment ]; then
+    current_reload_cmd=$(grep "^SYS_RELOAD_CMD=" /etc/environment | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+fi
+
+if [ -n "$current_reload_cmd" ]; then
+    echo -n "请输入证书更新后的重载命令 (当前: $current_reload_cmd，Enter保持不变): "
+else
+    echo -n "请输入证书更新后的重载命令 (推荐: nginx -t && nginx -s reload): "
+fi
+read reload_cmd
+
+if [ -n "$reload_cmd" ]; then
+    # 保存到环境变量
+    if [ ! -f /etc/environment ]; then
+        touch /etc/environment
+    fi
+    sed -i "/^SYS_RELOAD_CMD=/d" /etc/environment 2>/dev/null
+    echo "SYS_RELOAD_CMD=\"$reload_cmd\"" >> /etc/environment
+    export SYS_RELOAD_CMD="$reload_cmd"
+    log_success "重载命令已设置: $reload_cmd"
+elif [ -n "$current_reload_cmd" ]; then
+    log_success "重载命令保持不变: $current_reload_cmd"
+else
+    log_warning "未设置重载命令，证书更新后不会自动重载服务"
+fi
+
+# 11. Run Initial Sync
 log_info "正在执行首次同步..."
 echo ""
 "$SYNC_SCRIPT_PATH"

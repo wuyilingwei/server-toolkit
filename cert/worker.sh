@@ -209,16 +209,23 @@ fi
 CUSTOM_COMMAND=""
 
 custom_command() {
-    if [ -n "$CUSTOM_COMMAND" ]; then
-        log "执行自定义命令: $CUSTOM_COMMAND"
-        eval "$CUSTOM_COMMAND"
+    # Read custom reload command from environment variable
+    local custom_cmd="${SYS_RELOAD_CMD}"
+    
+    if [ -n "$custom_cmd" ]; then
+        log "执行自定义重载命令: $custom_cmd"
+        if eval "$custom_cmd" 2>&1 | tee -a "$LOG_FILE"; then
+            log "自定义重载命令执行成功"
+        else
+            log "警告: 自定义重载命令执行失败，返回码: $?"
+        fi
     else
-        log "未配置自定义命令，跳过执行"
+        log "未配置自定义重载命令，跳过执行"
     fi
 }
 
-# Example: Uncomment and set CUSTOM_COMMAND to reload nginx after updates
-# CUSTOM_COMMAND="systemctl reload nginx"
+# 自定义重载命令将从环境变量 SYS_RELOAD_CMD 读取
+# 推荐设置: nginx -t && nginx -s reload
 
 # Call custom_command at the end of the script
 custom_command
