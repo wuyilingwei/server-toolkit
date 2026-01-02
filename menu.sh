@@ -159,33 +159,7 @@ configure_device_uuid() {
     fi
 }
 
-# 更新模块
-update_modules() {
-    echo ""
-    echo -e "${COLOR_CYAN}==================== 更新模块 ====================${COLOR_RESET}"
-    
-    log_info "模块现在通过远程执行，无需手动更新"
-    log_info "已安装的持久化模块会在重新执行时自动更新"
-    
-    # 显示已安装的持久化模块
-    local installed=$(read_installed_config)
-    local installed_modules=$(echo "$installed" | jq -r '.modules[]? | "\(.id | @sh) v\(.version | @sh)"' 2>/dev/null)
-    
-    if [ -n "$installed_modules" ]; then
-        echo ""
-        echo -e "${COLOR_GREEN}已安装的持久化模块:${COLOR_RESET}"
-        while IFS= read -r line; do
-            echo "  - $line"
-        done <<< "$installed_modules"
-        echo ""
-        log_info "重新执行对应菜单选项即可更新这些模块"
-    else
-        echo ""
-        log_info "当前没有已安装的持久化模块"
-    fi
-    
-    echo ""
-}
+
 
 # 显示当前配置
 show_current_config() {
@@ -201,15 +175,21 @@ show_current_config() {
     
     echo -e "${COLOR_GREEN}已安装的持久化模块:${COLOR_RESET}"
     local installed=$(read_installed_config)
-    local installed_modules=$(echo "$installed" | jq -r '.modules[]?' 2>/dev/null)
     
-    if [ -n "$installed_modules" ]; then
-        echo "$installed_modules" | while IFS= read -r module; do
-            local id=$(echo "$module" | jq -r '.id')
-            local version=$(echo "$module" | jq -r '.version')
-            local installed_at=$(echo "$module" | jq -r '.installed_at // "未知时间"')
-            echo "  - $id (v$version) - 安装于 $installed_at"
-        done
+    # 验证JSON格式
+    if ! echo "$installed" | jq empty 2>/dev/null; then
+        echo "  (配置文件损坏，已重置)"
+        echo ""
+        return
+    fi
+    
+    # 直接使用jq来格式化输出，避免复杂的while循环
+    local module_count=$(echo "$installed" | jq -r '.modules | length' 2>/dev/null)
+    
+    if [ "$module_count" -gt 0 ] 2>/dev/null; then
+        echo "$installed" | jq -r '.modules[] | "  - " + .id + " (v" + .version + ") - 安装于 " + (.installed_at // "未知时间")' 2>/dev/null || {
+            echo "  (模块信息解析失败)"
+        }
     else
         echo "  (无已安装的持久化模块)"
     fi
@@ -273,8 +253,7 @@ show_menu() {
     echo -e "${COLOR_YELLOW}[1]${COLOR_RESET} 配置 Vault URL"
     echo -e "${COLOR_YELLOW}[2]${COLOR_RESET} 配置设备 UUID"
     echo -e "${COLOR_YELLOW}[3]${COLOR_RESET} 工具包自更新"
-    echo -e "${COLOR_YELLOW}[4]${COLOR_RESET} 更新模块"
-    echo -e "${COLOR_YELLOW}[5]${COLOR_RESET} 显示当前配置"
+    echo -e "${COLOR_YELLOW}[4]${COLOR_RESET} 显示当前配置"
     
     echo ""
     
@@ -377,12 +356,9 @@ main_loop() {
                 config=$(read_repo_config)
                 ;;
             4)
-                update_modules
-                ;;
-            5)
                 show_current_config
                 ;;
-            6|7|8|9)
+            5|6|7|8|9)
                 log_warning "此功能保留待用"
                 ;;
             *)

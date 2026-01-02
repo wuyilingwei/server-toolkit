@@ -292,7 +292,15 @@ read_installed_config() {
     local installed_file="$install_dir/installed.json"
     
     if [ -f "$installed_file" ]; then
-        cat "$installed_file"
+        # 验证JSON格式
+        if jq empty "$installed_file" 2>/dev/null; then
+            cat "$installed_file"
+        else
+            # JSON损坏，重置为空配置并备份损坏的文件
+            log_warning "检测到损坏的 installed.json，正在重置..."
+            [ -f "$installed_file" ] && mv "$installed_file" "${installed_file}.backup.$(date +%s)"
+            echo '{"modules":[]}'
+        fi
     else
         echo '{"modules":[]}'
     fi
@@ -307,7 +315,13 @@ write_installed_config() {
     # 确保目录存在
     mkdir -p "$install_dir"
     
-    echo "$content" > "$installed_file"
+    # 验证JSON格式后再写入
+    if echo "$content" | jq empty 2>/dev/null; then
+        echo "$content" > "$installed_file"
+    else
+        log_error "尝试写入无效的JSON内容，操作被拒绝"
+        return 1
+    fi
 }
 
 # 获取已安装模块的版本
@@ -315,7 +329,13 @@ get_installed_version() {
     local module_id="$1"
     local installed=$(read_installed_config)
     
-    local version=$(echo "$installed" | jq -r --arg id "$module_id" '.modules[] | select(.id == $id) | .version')
+    # 验证JSON格式
+    if ! echo "$installed" | jq empty 2>/dev/null; then
+        echo "未安装"
+        return
+    fi
+    
+    local version=$(echo "$installed" | jq -r --arg id "$module_id" '.modules[] | select(.id == $id) | .version' 2>/dev/null)
     
     # 如果版本为空或null，返回"未安装"
     if [ -z "$version" ] || [ "$version" = "null" ]; then
@@ -332,12 +352,24 @@ register_module_install() {
     local timestamp="$(date -Iseconds)"
     local installed=$(read_installed_config)
     
+    # 验证输入的JSON
+    if ! echo "$installed" | jq empty 2>/dev/null; then
+        log_warning "installed.json 格式错误，重新初始化"
+        installed='{"modules":[]}'
+    fi
+    
     # 移除旧记录
-    installed=$(echo "$installed" | jq --arg id "$module_id" 'del(.modules[] | select(.id == $id))')
+    installed=$(echo "$installed" | jq --arg id "$module_id" 'del(.modules[] | select(.id == $id))' 2>/dev/null) || {
+        log_error "JSON处理失败，重新初始化配置"
+        installed='{"modules":[]}'
+    }
     
     # 添加新记录 - 使用 jq 参数避免 JSON 注入
     installed=$(echo "$installed" | jq --arg id "$module_id" --arg ver "$version" --arg ts "$timestamp" \
-        '.modules += [{"id": $id, "version": $ver, "installed_at": $ts}]')
+        '.modules += [{"id": $id, "version": $ver, "installed_at": $ts}]' 2>/dev/null) || {
+        log_error "无法更新模块安装记录"
+        return 1
+    }
     
     write_installed_config "$installed"
 }
