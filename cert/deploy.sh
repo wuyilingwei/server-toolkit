@@ -256,46 +256,7 @@ ${domain_map[$id]}"
     done
 fi
 
-# 4. Select Domains for CF Origin Certificates
-echo ""
-echo -e "${COLOR_GREEN}=== 选择要同步的源站证书 (Cloudflare Origin) ===${COLOR_RESET}"
-echo "源站证书包含: domain-cf-cert, domain-cf-privkey"
-echo ""
 
-# 检查是否已有配置
-current_cf_domains=""
-if [ -f "$CONFIG_FILE" ]; then
-    current_cf_domains=$(jq -r '.cf_origin[]?' "$CONFIG_FILE" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
-fi
-
-echo -e "${COLOR_BLUE}可选择的源站证书域名:${COLOR_RESET}"
-
-# 按正确顺序显示有源站证书的域名
-cf_available_list=""
-for ((idx=1; idx<=i-1; idx++)); do
-    if [ "${cf_available[$idx]}" = "true" ]; then
-        echo "[$idx] ${domain_map[$idx]}"
-        if [ -n "$cf_available_list" ]; then
-            cf_available_list="$cf_available_list,$idx"
-        else
-            cf_available_list="$idx"
-        fi
-    fi
-done
-
-if [ -z "$cf_available_list" ]; then
-    echo -e "${COLOR_RED}没有可用的源站证书${COLOR_RESET}"
-    echo ""
-else
-    echo ""
-    if [ -n "$current_cf_domains" ]; then
-        echo -e "${COLOR_CYAN}当前已配置的源站证书: $current_cf_domains${COLOR_RESET}"
-        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，Enter保持不变): "
-    else
-        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
-    fi
-    read cf_selection
-fi
 echo ""
 echo -e "${COLOR_GREEN}=== 选择要同步的源站证书 (Cloudflare Origin) ===${COLOR_RESET}"
 echo "源站证书包含: domain-cf-cert, domain-cf-privkey"
@@ -465,7 +426,7 @@ fi
 log_info "生成配置文件: $CONFIG_FILE"
 
 # Build JSON configuration
-CONFIG_JSON='{"production":[],"cf_origin":[],"symlinks":{"etc_ssl":false,"nginx_ssl":false}}'
+CONFIG_JSON='{"production":[],"cf_origin":[],"symlinks":{"etc_ssl":false,"nginx_ssl":false},"reload_command":""}'
 
 if [ -n "$PROD_DOMAINS" ]; then
     while IFS= read -r domain; do
@@ -486,6 +447,11 @@ CONFIG_JSON=$(echo "$CONFIG_JSON" | jq \
     --argjson etc_ssl "$CREATE_ETC_SSL_LINK" \
     --argjson nginx_ssl "$CREATE_NGINX_SSL_LINK" \
     '.symlinks.etc_ssl = $etc_ssl | .symlinks.nginx_ssl = $nginx_ssl')
+
+# Add reload command configuration
+if [ -n "$RELOAD_COMMAND" ]; then
+    CONFIG_JSON=$(echo "$CONFIG_JSON" | jq --arg cmd "$RELOAD_COMMAND" '.reload_command = $cmd')
+fi
 
 echo "$CONFIG_JSON" | jq '.' > "$CONFIG_FILE"
 
@@ -532,10 +498,10 @@ log_success "定时任务已配置"
 echo ""
 echo -e "${COLOR_CYAN}=== 服务重载命令配置 ===${COLOR_RESET}"
 
-# 从环境变量或配置文件读取当前命令
+# 从配置文件读取当前命令
 current_reload_cmd=""
-if [ -f /etc/environment ]; then
-    current_reload_cmd=$(grep "^SYS_RELOAD_CMD=" /etc/environment | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+if [ -f "$CONFIG_FILE" ]; then
+    current_reload_cmd=$(jq -r '.reload_command // ""' "$CONFIG_FILE" 2>/dev/null)
 fi
 
 if [ -n "$current_reload_cmd" ]; then
@@ -545,17 +511,15 @@ else
 fi
 read reload_cmd
 
-if [ -n "$reload_cmd" ]; then
-    # 保存到环境变量
-    if [ ! -f /etc/environment ]; then
-        touch /etc/environment
-    fi
-    sed -i "/^SYS_RELOAD_CMD=/d" /etc/environment 2>/dev/null
-    echo "SYS_RELOAD_CMD=\"$reload_cmd\"" >> /etc/environment
-    export SYS_RELOAD_CMD="$reload_cmd"
+# 处理重载命令配置
+RELOAD_COMMAND=""
+if [ -z "$reload_cmd" ] && [ -n "$current_reload_cmd" ]; then
+    # 空选择且有现有配置，保持不变
+    RELOAD_COMMAND="$current_reload_cmd"
+    log_success "保持现有的重载命令: $current_reload_cmd"
+elif [ -n "$reload_cmd" ]; then
+    RELOAD_COMMAND="$reload_cmd"
     log_success "重载命令已设置: $reload_cmd"
-elif [ -n "$current_reload_cmd" ]; then
-    log_success "重载命令保持不变: $current_reload_cmd"
 else
     log_warning "未设置重载命令，证书更新后不会自动重载服务"
 fi

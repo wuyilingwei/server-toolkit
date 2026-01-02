@@ -205,12 +205,14 @@ if [ "$CREATE_NGINX_SSL" = "true" ]; then
     create_symlinks_for_directory "$CERT_DIR" "/etc/nginx/ssl"
 fi
 
-# Custom command after updates (configurable)
-CUSTOM_COMMAND=""
+# Custom command after updates (configurable from JSON config)
 
 custom_command() {
-    # Read custom reload command from environment variable
-    local custom_cmd="${SYS_RELOAD_CMD}"
+    # Read custom reload command from JSON configuration
+    local custom_cmd=""
+    if [ -f "$CONFIG_FILE" ]; then
+        custom_cmd=$(echo "$CONFIG" | jq -r '.reload_command // ""' 2>/dev/null)
+    fi
     
     if [ -n "$custom_cmd" ]; then
         log "执行自定义重载命令: $custom_cmd"
@@ -224,7 +226,7 @@ custom_command() {
     fi
 }
 
-# 自定义重载命令将从环境变量 SYS_RELOAD_CMD 读取
+# 自定义重载命令从JSON配置文件的reload_command字段读取
 # 推荐设置: nginx -t && nginx -s reload
 
 # Call custom_command at the end of the script
