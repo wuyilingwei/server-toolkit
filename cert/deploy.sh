@@ -372,7 +372,37 @@ if [ -z "$PROD_DOMAINS" ] && [ -z "$CF_DOMAINS" ]; then
     fi
 fi
 
-# 5. Ask about symbolic links
+# 6. 配置自定义重载命令
+echo ""
+echo -e "${COLOR_CYAN}=== 服务重载命令配置 ===${COLOR_RESET}"
+
+# 从配置文件读取当前命令
+current_reload_cmd=""
+if [ -f "$CONFIG_FILE" ]; then
+    current_reload_cmd=$(jq -r '.reload_command // ""' "$CONFIG_FILE" 2>/dev/null)
+fi
+
+if [ -n "$current_reload_cmd" ]; then
+    echo -n "请输入证书更新后的重载命令 (当前: $current_reload_cmd，Enter保持不变): "
+else
+    echo -n "请输入证书更新后的重载命令 (推荐: nginx -t && nginx -s reload): "
+fi
+read reload_cmd
+
+# 处理重载命令配置
+RELOAD_COMMAND=""
+if [ -z "$reload_cmd" ] && [ -n "$current_reload_cmd" ]; then
+    # 空选择且有现有配置，保持不变
+    RELOAD_COMMAND="$current_reload_cmd"
+    log_success "保持现有的重载命令: $current_reload_cmd"
+elif [ -n "$reload_cmd" ]; then
+    RELOAD_COMMAND="$reload_cmd"
+    log_success "重载命令已设置: $reload_cmd"
+else
+    log_warning "未设置重载命令，证书更新后不会自动重载服务"
+fi
+
+# 7. Ask about symbolic links
 echo ""
 echo -e "${COLOR_CYAN}=== 符号链接配置 ===${COLOR_RESET}"
 echo "可以创建符号链接到常用的证书目录，方便其他服务使用"
@@ -422,7 +452,7 @@ else
     log_info "不创建 /etc/nginx/ssl 符号链接"
 fi
 
-# 6. Generate Configuration File
+# 8. Generate Configuration File
 log_info "生成配置文件: $CONFIG_FILE"
 
 # Build JSON configuration
@@ -455,7 +485,13 @@ fi
 
 echo "$CONFIG_JSON" | jq '.' > "$CONFIG_FILE"
 
-# 7. Deploy Worker Script
+log_success "配置已保存到: $CONFIG_FILE"
+echo ""
+echo "配置内容:"
+cat "$CONFIG_FILE"
+echo ""
+
+# 9. Deploy Worker Script
 log_info "部署同步脚本: $SYNC_SCRIPT_PATH"
 
 # Get the directory where deploy.sh is located (scripts directory in repo)
@@ -473,7 +509,7 @@ cp "$WORKER_TEMPLATE" "$SYNC_SCRIPT_PATH"
 
 chmod +x "$SYNC_SCRIPT_PATH"
 
-# 8. Setup Cron Job with #server-toolkit-cert tag
+# 10. Setup Cron Job with #server-toolkit-cert tag
 log_info "配置定时任务 (每小时执行一次)..."
 TAG="# server-toolkit-cert"
 CRON_CMD="0 * * * * $SYNC_SCRIPT_PATH >> $LOG_FILE 2>&1 $TAG"
@@ -487,43 +523,6 @@ crontab /tmp/cron.tmp
 rm /tmp/cron.tmp
 
 log_success "定时任务已配置"
-
-# 10. 配置自定义重载命令
-echo ""
-echo -e "${COLOR_CYAN}=== 服务重载命令配置 ===${COLOR_RESET}"
-
-# 从配置文件读取当前命令
-current_reload_cmd=""
-if [ -f "$CONFIG_FILE" ]; then
-    current_reload_cmd=$(jq -r '.reload_command // ""' "$CONFIG_FILE" 2>/dev/null)
-fi
-
-if [ -n "$current_reload_cmd" ]; then
-    echo -n "请输入证书更新后的重载命令 (当前: $current_reload_cmd，Enter保持不变): "
-else
-    echo -n "请输入证书更新后的重载命令 (推荐: nginx -t && nginx -s reload): "
-fi
-read reload_cmd
-
-# 处理重载命令配置
-RELOAD_COMMAND=""
-if [ -z "$reload_cmd" ] && [ -n "$current_reload_cmd" ]; then
-    # 空选择且有现有配置，保持不变
-    RELOAD_COMMAND="$current_reload_cmd"
-    log_success "保持现有的重载命令: $current_reload_cmd"
-elif [ -n "$reload_cmd" ]; then
-    RELOAD_COMMAND="$reload_cmd"
-    log_success "重载命令已设置: $reload_cmd"
-else
-    log_warning "未设置重载命令，证书更新后不会自动重载服务"
-fi
-
-# 更新配置文件
-log_success "配置已保存到: $CONFIG_FILE"
-echo ""
-echo "配置内容:"
-cat "$CONFIG_FILE"
-echo ""
 
 # 11. Run Initial Sync
 log_info "正在执行首次同步..."
