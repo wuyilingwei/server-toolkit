@@ -190,11 +190,18 @@ echo ""
 echo -e "${COLOR_GREEN}=== 选择要同步的生产证书 ===${COLOR_RESET}"
 echo "生产证书包含: domain-cert, domain-fullchain, domain-privkey"
 echo ""
+
+# 检查是否已有配置
+current_prod_domains=""
+if [ -f "$CONFIG_FILE" ]; then
+    current_prod_domains=$(jq -r '.production[]?' "$CONFIG_FILE" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+fi
+
 echo -e "${COLOR_BLUE}可选择的生产证书域名:${COLOR_RESET}"
 
-# 显示有生产证书的域名
+# 按正确顺序显示有生产证书的域名
 prod_available_list=""
-for idx in "${!domain_map[@]}"; do
+for ((idx=1; idx<=i-1; idx++)); do
     if [ "${prod_available[$idx]}" = "true" ]; then
         echo "[$idx] ${domain_map[$idx]}"
         if [ -n "$prod_available_list" ]; then
@@ -210,14 +217,27 @@ if [ -z "$prod_available_list" ]; then
     echo ""
 else
     echo ""
-    echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
+    if [ -n "$current_prod_domains" ]; then
+        echo -e "${COLOR_CYAN}当前已配置的生产证书: $current_prod_domains${COLOR_RESET}"
+        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，Enter保持不变): "
+    else
+        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
+    fi
     read prod_selection
 fi
 
 PROD_DOMAINS=""
-if [ "$prod_selection" = "all" ]; then
+if [ -z "$prod_selection" ] && [ -n "$current_prod_domains" ]; then
+    # 空选择且有现有配置，保持不变
+    IFS=',' read -ra current_domains <<< "$current_prod_domains"
+    for domain in "${current_domains[@]}"; do
+        PROD_DOMAINS="$PROD_DOMAINS
+$domain"
+    done
+    log_success "保持现有的生产证书配置"
+elif [ "$prod_selection" = "all" ]; then
     # 只选择有生产证书的域名
-    for idx in "${!domain_map[@]}"; do
+    for idx in $(seq 1 $((i-1))); do
         if [ "${prod_available[$idx]}" = "true" ]; then
             PROD_DOMAINS="$PROD_DOMAINS
 ${domain_map[$idx]}"
@@ -241,11 +261,18 @@ echo ""
 echo -e "${COLOR_GREEN}=== 选择要同步的源站证书 (Cloudflare Origin) ===${COLOR_RESET}"
 echo "源站证书包含: domain-cf-cert, domain-cf-privkey"
 echo ""
+
+# 检查是否已有配置
+current_cf_domains=""
+if [ -f "$CONFIG_FILE" ]; then
+    current_cf_domains=$(jq -r '.cf_origin[]?' "$CONFIG_FILE" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+fi
+
 echo -e "${COLOR_BLUE}可选择的源站证书域名:${COLOR_RESET}"
 
-# 显示有源站证书的域名
+# 按正确顺序显示有源站证书的域名
 cf_available_list=""
-for idx in "${!domain_map[@]}"; do
+for ((idx=1; idx<=i-1; idx++)); do
     if [ "${cf_available[$idx]}" = "true" ]; then
         echo "[$idx] ${domain_map[$idx]}"
         if [ -n "$cf_available_list" ]; then
@@ -261,14 +288,66 @@ if [ -z "$cf_available_list" ]; then
     echo ""
 else
     echo ""
-    echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
+    if [ -n "$current_cf_domains" ]; then
+        echo -e "${COLOR_CYAN}当前已配置的源站证书: $current_cf_domains${COLOR_RESET}"
+        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，Enter保持不变): "
+    else
+        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
+    fi
+    read cf_selection
+fi
+echo ""
+echo -e "${COLOR_GREEN}=== 选择要同步的源站证书 (Cloudflare Origin) ===${COLOR_RESET}"
+echo "源站证书包含: domain-cf-cert, domain-cf-privkey"
+echo ""
+
+# 检查是否已有配置
+current_cf_domains=""
+if [ -f "$CONFIG_FILE" ]; then
+    current_cf_domains=$(jq -r '.cf_origin[]?' "$CONFIG_FILE" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+fi
+
+echo -e "${COLOR_BLUE}可选择的源站证书域名:${COLOR_RESET}"
+
+# 按正确顺序显示有源站证书的域名
+cf_available_list=""
+for ((idx=1; idx<=i-1; idx++)); do
+    if [ "${cf_available[$idx]}" = "true" ]; then
+        echo "[$idx] ${domain_map[$idx]}"
+        if [ -n "$cf_available_list" ]; then
+            cf_available_list="$cf_available_list,$idx"
+        else
+            cf_available_list="$idx"
+        fi
+    fi
+done
+
+if [ -z "$cf_available_list" ]; then
+    echo -e "${COLOR_RED}没有可用的源站证书${COLOR_RESET}"
+    echo ""
+else
+    echo ""
+    if [ -n "$current_cf_domains" ]; then
+        echo -e "${COLOR_CYAN}当前已配置的源站证书: $current_cf_domains${COLOR_RESET}"
+        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，Enter保持不变): "
+    else
+        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
+    fi
     read cf_selection
 fi
 
 CF_DOMAINS=""
-if [ "$cf_selection" = "all" ]; then
+if [ -z "$cf_selection" ] && [ -n "$current_cf_domains" ]; then
+    # 空选择且有现有配置，保持不变
+    IFS=',' read -ra current_domains <<< "$current_cf_domains"
+    for domain in "${current_domains[@]}"; do
+        CF_DOMAINS="$CF_DOMAINS
+$domain"
+    done
+    log_success "保持现有的源站证书配置"
+elif [ "$cf_selection" = "all" ]; then
     # 只选择有源站证书的域名
-    for idx in "${!domain_map[@]}"; do
+    for idx in $(seq 1 $((i-1))); do
         if [ "${cf_available[$idx]}" = "true" ]; then
             CF_DOMAINS="$CF_DOMAINS
 ${domain_map[$idx]}"
@@ -338,20 +417,48 @@ echo -e "${COLOR_CYAN}=== 符号链接配置 ===${COLOR_RESET}"
 echo "可以创建符号链接到常用的证书目录，方便其他服务使用"
 echo ""
 
-echo -n "是否创建 /etc/ssl 符号链接? (y/n，默认: n，Enter确认): "
-read link_etc_ssl
-CREATE_ETC_SSL_LINK="false"
-if [ "$link_etc_ssl" = "y" ] || [ "$link_etc_ssl" = "Y" ]; then
-    CREATE_ETC_SSL_LINK="true"
-    log_success "将创建 /etc/ssl 符号链接"
+# 检查现有配置
+current_etc_ssl="false"
+current_nginx_ssl="false"
+if [ -f "$CONFIG_FILE" ]; then
+    current_etc_ssl=$(jq -r '.symlinks.etc_ssl // false' "$CONFIG_FILE" 2>/dev/null)
+    current_nginx_ssl=$(jq -r '.symlinks.nginx_ssl // false' "$CONFIG_FILE" 2>/dev/null)
 fi
 
-echo -n "是否创建 /etc/nginx/ssl 符号链接? (y/n，默认: n，Enter确认): "
+if [ "$current_etc_ssl" = "true" ]; then
+    echo -n "是否创建 /etc/ssl 符号链接? (当前: 已启用, y/n, Enter保持不变): "
+else
+    echo -n "是否创建 /etc/ssl 符号链接? (y/n，默认: n，Enter确认): "
+fi
+read link_etc_ssl
+CREATE_ETC_SSL_LINK="false"
+if [ -z "$link_etc_ssl" ] && [ "$current_etc_ssl" = "true" ]; then
+    # 空选择且已启用，保持不变
+    CREATE_ETC_SSL_LINK="true"
+    log_success "保持 /etc/ssl 符号链接已启用"
+elif [ "$link_etc_ssl" = "y" ] || [ "$link_etc_ssl" = "Y" ]; then
+    CREATE_ETC_SSL_LINK="true"
+    log_success "将创建 /etc/ssl 符号链接"
+else
+    log_info "不创建 /etc/ssl 符号链接"
+fi
+
+if [ "$current_nginx_ssl" = "true" ]; then
+    echo -n "是否创建 /etc/nginx/ssl 符号链接? (当前: 已启用, y/n, Enter保持不变): "
+else
+    echo -n "是否创建 /etc/nginx/ssl 符号链接? (y/n，默认: n，Enter确认): "
+fi
 read link_nginx_ssl
 CREATE_NGINX_SSL_LINK="false"
-if [ "$link_nginx_ssl" = "y" ] || [ "$link_nginx_ssl" = "Y" ]; then
+if [ -z "$link_nginx_ssl" ] && [ "$current_nginx_ssl" = "true" ]; then
+    # 空选择且已启用，保持不变
+    CREATE_NGINX_SSL_LINK="true"
+    log_success "保持 /etc/nginx/ssl 符号链接已启用"
+elif [ "$link_nginx_ssl" = "y" ] || [ "$link_nginx_ssl" = "Y" ]; then
     CREATE_NGINX_SSL_LINK="true"
     log_success "将创建 /etc/nginx/ssl 符号链接"
+else
+    log_info "不创建 /etc/nginx/ssl 符号链接"
 fi
 
 # 6. Generate Configuration File
