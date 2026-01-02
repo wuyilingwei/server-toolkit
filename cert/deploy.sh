@@ -508,11 +508,11 @@ chmod +x "$SYNC_SCRIPT_PATH"
 
 # 10. Setup Cron Job with #server-toolkit-cert tag
 log_info "配置定时任务 (每小时执行一次)..."
-TAG="# server-toolkit-cert"
+TAG="#server-toolkit-cert"
 CRON_CMD="0 * * * * . /etc/environment; $SYNC_SCRIPT_PATH >> $LOG_FILE 2>&1 $TAG"
 
 # Remove all old cert jobs (with server-toolkit-cert tag)
-crontab -l 2>/dev/null | grep -v "server-toolkit-cert" > /tmp/cron.tmp || true
+crontab -l 2>/dev/null | grep -v "#server-toolkit-cert" > /tmp/cron.tmp || true
 
 # Add new job
 echo "$CRON_CMD" >> /tmp/cron.tmp

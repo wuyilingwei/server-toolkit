@@ -80,7 +80,7 @@ echo -e "${COLOR_GREEN}✓ Worker 脚本已部署到: $WORKER_SCRIPT${COLOR_RESE
 
 # 4. 管理 Crontab
 echo -e "\n${COLOR_BLUE}步骤 4: 配置定时任务${COLOR_RESET}"
-crontab -l 2>/dev/null | grep -v "#rsync-fail2ban" | grep -v "#ssh-security" > /tmp/cron_tmp
+crontab -l 2>/dev/null | grep -v "#ssh-security" > /tmp/cron_tmp
 echo "*/10 * * * * . /etc/environment; /bin/sh $WORKER_SCRIPT >> $LOG_FILE 2>&1 #ssh-security" >> /tmp/cron_tmp
 crontab /tmp/cron_tmp
 rm /tmp/cron_tmp
