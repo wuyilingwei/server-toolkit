@@ -35,11 +35,11 @@ CREATE_NGINX_SSL=$(echo "$CONFIG" | jq -r '.symlinks.nginx_ssl // false' 2>/dev/
 # Function to extract certificate value from JSON response
 get_cert_value() {
     local response="$1"
-    local key="$2"
+    local id="$2"
     
     # Extract value directly - jq -r automatically handles \n escape sequences
-    echo "$response" | jq -r --arg k "$key" \
-        '.[0].data[] | select(.key == $k) | .value // empty'
+    echo "$response" | jq -r --arg id "$id" \
+        '.[] | select(.id == $id) | .data.content // empty'
 }
 
 # Sync production certificates
@@ -68,9 +68,9 @@ if [ -n "$PROD_DOMAINS" ]; then
         fi
         
         # Extract and save certificates with original naming
-        CERT=$(get_cert_value "$RESPONSE" "${domain}-cert")
-        FULLCHAIN=$(get_cert_value "$RESPONSE" "${domain}-fullchain")
-        PRIVKEY=$(get_cert_value "$RESPONSE" "${domain}-privkey")
+        CERT=$(get_cert_value "$RESPONSE" "cert")
+        FULLCHAIN=$(get_cert_value "$RESPONSE" "fullchain")
+        PRIVKEY=$(get_cert_value "$RESPONSE" "privkey")
         
         if [ -n "$CERT" ]; then
             echo "$CERT" > "$CERT_DIR/${domain}-cert"
@@ -116,8 +116,8 @@ if [ -n "$CF_DOMAINS" ]; then
         fi
         
         # Extract and save CF certificates with original naming
-        CF_CERT=$(get_cert_value "$RESPONSE" "${domain}-cf-cert")
-        CF_PRIVKEY=$(get_cert_value "$RESPONSE" "${domain}-cf-privkey")
+        CF_CERT=$(get_cert_value "$RESPONSE" "cf-cert")
+        CF_PRIVKEY=$(get_cert_value "$RESPONSE" "cf-privkey")
         
         if [ -n "$CF_CERT" ]; then
             echo "$CF_CERT" > "$CERT_DIR/${domain}-cf-cert"
