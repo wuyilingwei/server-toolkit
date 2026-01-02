@@ -136,12 +136,52 @@ if [ -z "$DOMAINS" ]; then
     exit 1
 fi
 
-echo -e "${COLOR_BLUE}=== 检测到的域名 ===${COLOR_RESET}"
+# 检查每个域名的可用证书类型
+echo -e "${COLOR_BLUE}=== 检测到的域名和可用证书类型 ===${COLOR_RESET}"
 i=1
 declare -A domain_map
+declare -A prod_available
+declare -A cf_available
+
 while IFS= read -r domain; do
     echo "[$i] $domain"
     domain_map[$i]="$domain"
+    
+    # 检查生产证书
+    prod_certs=""
+    if echo "$ALL_KEYS" | grep -q "^${domain}-cert$"; then
+        prod_certs="${prod_certs}cert "
+    fi
+    if echo "$ALL_KEYS" | grep -q "^${domain}-fullchain$"; then
+        prod_certs="${prod_certs}fullchain "
+    fi
+    if echo "$ALL_KEYS" | grep -q "^${domain}-privkey$"; then
+        prod_certs="${prod_certs}privkey "
+    fi
+    
+    # 检查源站证书
+    cf_certs=""
+    if echo "$ALL_KEYS" | grep -q "^${domain}-cf-cert$"; then
+        cf_certs="${cf_certs}cf-cert "
+    fi
+    if echo "$ALL_KEYS" | grep -q "^${domain}-cf-privkey$"; then
+        cf_certs="${cf_certs}cf-privkey "
+    fi
+    
+    if [ -n "$prod_certs" ]; then
+        echo "    生产证书: ${COLOR_GREEN}${prod_certs}${COLOR_RESET}"
+        prod_available[$i]="true"
+    fi
+    
+    if [ -n "$cf_certs" ]; then
+        echo "    源站证书: ${COLOR_YELLOW}${cf_certs}${COLOR_RESET}"
+        cf_available[$i]="true"
+    fi
+    
+    if [ -z "$prod_certs" ] && [ -z "$cf_certs" ]; then
+        echo "    ${COLOR_RED}无可用证书${COLOR_RESET}"
+    fi
+    
     ((i++))
 done <<< "$DOMAINS"
 echo ""
@@ -149,19 +189,49 @@ echo ""
 # 3. Select Domains for Production Certificates
 echo -e "${COLOR_GREEN}=== 选择要同步的生产证书 ===${COLOR_RESET}"
 echo "生产证书包含: domain-cert, domain-fullchain, domain-privkey"
-echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
-read prod_selection
+echo ""
+echo -e "${COLOR_BLUE}可选择的生产证书域名:${COLOR_RESET}"
+
+# 显示有生产证书的域名
+prod_available_list=""
+for idx in "${!domain_map[@]}"; do
+    if [ "${prod_available[$idx]}" = "true" ]; then
+        echo "[$idx] ${domain_map[$idx]}"
+        if [ -n "$prod_available_list" ]; then
+            prod_available_list="$prod_available_list,$idx"
+        else
+            prod_available_list="$idx"
+        fi
+    fi
+done
+
+if [ -z "$prod_available_list" ]; then
+    echo -e "${COLOR_RED}没有可用的生产证书${COLOR_RESET}"
+    echo ""
+else
+    echo ""
+    echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
+    read prod_selection
+fi
 
 PROD_DOMAINS=""
 if [ "$prod_selection" = "all" ]; then
-    PROD_DOMAINS="$DOMAINS"
+    # 只选择有生产证书的域名
+    for idx in "${!domain_map[@]}"; do
+        if [ "${prod_available[$idx]}" = "true" ]; then
+            PROD_DOMAINS="$PROD_DOMAINS
+${domain_map[$idx]}"
+        fi
+    done
 elif [ -n "$prod_selection" ]; then
     IFS=',' read -ra ADDR <<< "$prod_selection"
     for id in "${ADDR[@]}"; do
         id=$(echo "$id" | xargs)  # trim whitespace
-        if [ -n "${domain_map[$id]}" ]; then
+        if [ -n "${domain_map[$id]}" ] && [ "${prod_available[$id]}" = "true" ]; then
             PROD_DOMAINS="$PROD_DOMAINS
 ${domain_map[$id]}"
+        elif [ -n "${domain_map[$id]}" ]; then
+            log_warning "域名 ${domain_map[$id]} 没有可用的生产证书，已跳过"
         fi
     done
 fi
@@ -170,27 +240,96 @@ fi
 echo ""
 echo -e "${COLOR_GREEN}=== 选择要同步的源站证书 (Cloudflare Origin) ===${COLOR_RESET}"
 echo "源站证书包含: domain-cf-cert, domain-cf-privkey"
-echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
-read cf_selection
+echo ""
+echo -e "${COLOR_BLUE}可选择的源站证书域名:${COLOR_RESET}"
+
+# 显示有源站证书的域名
+cf_available_list=""
+for idx in "${!domain_map[@]}"; do
+    if [ "${cf_available[$idx]}" = "true" ]; then
+        echo "[$idx] ${domain_map[$idx]}"
+        if [ -n "$cf_available_list" ]; then
+            cf_available_list="$cf_available_list,$idx"
+        else
+            cf_available_list="$idx"
+        fi
+    fi
+done
+
+if [ -z "$cf_available_list" ]; then
+    echo -e "${COLOR_RED}没有可用的源站证书${COLOR_RESET}"
+    echo ""
+else
+    echo ""
+    echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
+    read cf_selection
+fi
 
 CF_DOMAINS=""
 if [ "$cf_selection" = "all" ]; then
-    CF_DOMAINS="$DOMAINS"
+    # 只选择有源站证书的域名
+    for idx in "${!domain_map[@]}"; do
+        if [ "${cf_available[$idx]}" = "true" ]; then
+            CF_DOMAINS="$CF_DOMAINS
+${domain_map[$idx]}"
+        fi
+    done
 elif [ -n "$cf_selection" ]; then
     IFS=',' read -ra ADDR <<< "$cf_selection"
     for id in "${ADDR[@]}"; do
         id=$(echo "$id" | xargs)  # trim whitespace
-        if [ -n "${domain_map[$id]}" ]; then
+        if [ -n "${domain_map[$id]}" ] && [ "${cf_available[$id]}" = "true" ]; then
             CF_DOMAINS="$CF_DOMAINS
 ${domain_map[$id]}"
+        elif [ -n "${domain_map[$id]}" ]; then
+            log_warning "域名 ${domain_map[$id]} 没有可用的源站证书，已跳过"
         fi
     done
 fi
 
+# 显示选择结果
+echo ""
+echo -e "${COLOR_CYAN}=== 证书同步选择确认 ===${COLOR_RESET}"
+if [ -n "$PROD_DOMAINS" ]; then
+    echo -e "${COLOR_GREEN}已选择的生产证书域名:${COLOR_RESET}"
+    while IFS= read -r domain; do
+        [ -z "$domain" ] && continue
+        echo "  - $domain (cert, fullchain, privkey)"
+    done <<< "$PROD_DOMAINS"
+else
+    echo -e "${COLOR_YELLOW}未选择生产证书${COLOR_RESET}"
+fi
+
+if [ -n "$CF_DOMAINS" ]; then
+    echo -e "${COLOR_GREEN}已选择的源站证书域名:${COLOR_RESET}"
+    while IFS= read -r domain; do
+        [ -z "$domain" ] && continue
+        echo "  - $domain (cf-cert, cf-privkey)"
+    done <<< "$CF_DOMAINS"
+else
+    echo -e "${COLOR_YELLOW}未选择源站证书${COLOR_RESET}"
+fi
+echo ""
+
 # Check if at least something was selected
 if [ -z "$PROD_DOMAINS" ] && [ -z "$CF_DOMAINS" ]; then
-    log_error "未选择任何域名或证书类型"
-    exit 1
+    echo ""
+    log_warning "未选择任何域名或证书类型"
+    echo ""
+    echo -e "${COLOR_CYAN}您有以下选择:${COLOR_RESET}"
+    echo "1. 重新运行该脚本进行选择"
+    echo "2. 检查 Vault 中是否存在所需的证书密钥"
+    echo "3. 确认您的设备 UUID 和 Vault URL 配置正确"
+    echo ""
+    echo -n "是否要继续配置符号链接和定时任务? (y/n, 默认: n): "
+    read continue_setup
+    
+    if [ "$continue_setup" != "y" ] && [ "$continue_setup" != "Y" ]; then
+        log_info "用户选择退出"
+        exit 0
+    else
+        log_info "继续进行基本配置..."
+    fi
 fi
 
 # 5. Ask about symbolic links
