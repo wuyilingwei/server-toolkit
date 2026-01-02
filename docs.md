@@ -14,7 +14,7 @@ Server Toolkit 是一个模块化的服务器管理工具包，提供统一的�
 ├── config.json                   # 模块和菜单元数据
 ├── helper.sh                     # 配置和工具函数库
 ├── cert/                         # 证书同步模块数据目录
-│   ├── local/                   # 同步的证书存储目录 (权限 600)
+│   ├── local/                   # 同步的证书存储目录 (权限 700)
 │   ├── sync-config.json         # 证书同步配置文件
 │   ├── worker.sh                # 证书同步工作脚本
 │   └── sync.log                 # 证书同步日志
@@ -171,7 +171,7 @@ sudo server-toolkit
 - 路径：`/srv/server-toolkit/cert/`
 - 内容：同步配置、工作脚本、日志文件
 - 证书存储：`/srv/server-toolkit/cert/local/`
-- 目录权限：建议 600（仅所有者可读写）
+- 目录权限：建议 700（仅所有者可读写执行）
 
 **使用方法：**
 ```bash

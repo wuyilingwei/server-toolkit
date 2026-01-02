@@ -81,13 +81,13 @@ fi
 echo ""
 echo -e "${COLOR_CYAN}=== 证书目录权限设置 ===${COLOR_RESET}"
 echo "证书将存储在: $CERT_LOCAL_DIR"
-echo -e "${COLOR_YELLOW}建议设置目录权限为 600 (仅所有者可读写) 以保护证书安全${COLOR_RESET}"
-echo -n "是否设置 cert/local 目录权限为 600? (y/n，默认: y): "
+echo -e "${COLOR_YELLOW}建议设置目录权限为 700 (仅所有者可读写执行) 以保护证书安全${COLOR_RESET}"
+echo -n "是否设置 cert/local 目录权限为 700? (y/n，默认: y): "
 read set_perm
 
 if [ -z "$set_perm" ] || [ "$set_perm" = "y" ] || [ "$set_perm" = "Y" ]; then
-    chmod 600 "$CERT_LOCAL_DIR"
-    log_success "已设置 cert/local 目录权限为 600"
+    chmod 700 "$CERT_LOCAL_DIR"
+    log_success "已设置 cert/local 目录权限为 700"
 else
     log_warning "跳过权限设置，当前权限: $(stat -c '%a' "$CERT_LOCAL_DIR")"
 fi
@@ -243,7 +243,7 @@ log() {
 
 # Ensure cert directory exists with correct permissions
 mkdir -p "$CERT_DIR"
-chmod 600 "$CERT_DIR"
+chmod 700 "$CERT_DIR"
 
 # Read configuration
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -364,12 +364,12 @@ WORKER_EOF
 
 chmod +x "$SYNC_SCRIPT_PATH"
 
-# 7. Setup Cron Job with #cert tag
+# 7. Setup Cron Job with #server-toolkit-cert tag
 log_info "配置定时任务 (每小时执行一次)..."
-TAG="#cert"
+TAG="#server-toolkit-cert"
 CRON_CMD="0 * * * * $SYNC_SCRIPT_PATH >> $LOG_FILE 2>&1 $TAG"
 
-# Remove all old cert jobs (with #cert tag)
+# Remove all old cert jobs (with #server-toolkit-cert tag)
 crontab -l 2>/dev/null | grep -v "$TAG" > /tmp/cron.tmp || true
 
 # Add new job
