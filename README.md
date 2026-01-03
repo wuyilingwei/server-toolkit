@@ -55,16 +55,19 @@ server-toolkit/
 ```
 
 **核心文件**：
+
 - `menu.sh` - 交互式菜单主程序
 - `config.json` - 模块和菜单元数据
 - `helper.sh` - 配置和工具函数库
 
 **scripts 目录**：
+
 - Git 克隆的完整仓库
 - 包含所有模块脚本
 - 支持自动更新
 
 **storage 目录**：
+
 - 持久化任务数据
 - 每个模块有独立子目录
 - 存储定时任务脚本和日志
@@ -87,6 +90,7 @@ wget -qO- https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/depl
 ```
 
 部署脚本会自动：
+
 - 检测并安装缺失的系统依赖（curl、jq、git、procps 等）
 - 克隆完整仓库到 `/srv/server-toolkit/scripts/`
 - 复制核心组件（config.json、helper.sh、menu.sh）到主目录
@@ -155,6 +159,7 @@ SYS_TOOLKIT_REPO="https://github.com/wuyilingwei/server-toolkit"
 ### 模块结构
 
 每个模块是一个独立的目录，包含：
+
 - `deploy.sh` - 模块部署/执行脚本
 - 其他必要的文件和子脚本
 
@@ -247,21 +252,6 @@ curl -X POST "https://your-vault-url.com/api/data" \
     }]
   }'
 ```
-
-### 响应格式
-
-```json
-[{
-  "data": {
-    "content": [
-      {"id": 1, "name": "SSH 安全防护部署", "script": "ssh-security/deploy.sh"},
-      {"id": 2, "name": "系统更新", "script": "system/update.sh"}
-    ]
-  }
-}]
-```
-
-## 使用示例
 
 ### 主界面
 
@@ -379,6 +369,7 @@ tail -f /srv/server-toolkit/cert/sync.log
 ### 系统信息显示 N/A
 
 网络信息获取失败，可能原因：
+
 - 服务器无公网 IP
 - 防火墙阻止出站连接
 - API 服务不可用
