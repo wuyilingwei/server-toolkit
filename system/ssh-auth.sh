@@ -106,13 +106,58 @@ check_existing_keys() {
 # 显示菜单
 show_menu() {
     echo "请选择操作:"
-    echo "1) 生成新的ED25519密钥对 (推荐)"
-    echo "2) 生成新的RSA密钥对"
-    echo "3) 仅配置SSH服务 (禁用密码登录)"
-    echo "4) 显示现有公钥"
-    echo "5) 显示现有私钥 (谨慎操作)"
+    echo "1) 一步配置 (ED25519密钥 + SSH服务 + 显示密钥) [推荐]"
+    echo "2) 生成新的ED25519密钥对"
+    echo "3) 生成新的RSA密钥对"
+    echo "4) 仅配置SSH服务 (禁用密码登录)"
     echo "0) 退出"
     echo ""
+}
+
+# 一步操作（生成ED25519密钥 + 配置SSH服务 + 显示密钥）
+quick_setup() {
+    echo ""
+    echo "🚀 开始一步配置 SSH 安全认证..."
+    echo ""
+    
+    # 检查是否已存在ED25519密钥
+    if [ -f "$KEY_FILE" ]; then
+        echo "⚠️  警告: ED25519密钥已存在，将会覆盖现有密钥"
+        echo "当前密钥: $KEY_FILE"
+        if [ -f "$KEY_FILE.pub" ]; then
+            echo "公钥内容: $(cat "$KEY_FILE.pub" 2>/dev/null || echo '读取失败')"
+        fi
+        echo ""
+        read -rp "是否继续覆盖? (y/n, 默认n): " confirm
+        confirm="${confirm:-n}"
+        if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+            echo "操作已取消"
+            return 1
+        fi
+    fi
+    
+    echo "1/3 🔐 生成ED25519密钥对..."
+    if ! generate_keypair "ed25519"; then
+        echo "❗ 密钥生成失败"
+        return 1
+    fi
+    
+    echo "2/3 🔧 配置SSH服务..."
+    if ! configure_ssh_service; then
+        echo "❗ SSH服务配置失败"
+        return 1
+    fi
+    
+    echo "3/3 📝 显示密钥信息..."
+    echo ""
+    echo "✅ 一步配置完成！"
+    echo "──────────────────────────────────────────────────"
+    echo "🔐 密码登录已禁用，仅允许密钥登录"
+    echo "⚠️  请务必妖善保管私钥，否则将无法再登录此主机！"
+    echo "🔄 复制私钥后，执行 'sudo systemctl restart sshd' 启用更改"
+    echo "──────────────────────────────────────────────────"
+    
+    return 0
 }
 
 # 配置SSH服务
@@ -185,14 +230,13 @@ generate_keypair() {
         echo "✅ 公钥已添加到 authorized_keys"
     fi
     
-    # 显示密钥
-    show_keys "$key_file"
+    return 0
 }
 
 # 显示密钥
 show_keys() {
     local key_file="$1"
-    local show_private="${2:-false}"
+    local show_private="${2:-true}"  # 默认显示私钥
     
     if [ -n "$key_file" ] && [ -f "$key_file.pub" ]; then
         echo ""
@@ -203,24 +247,30 @@ show_keys() {
         echo ""
         
         if [ "$show_private" = "true" ] && [ -f "$key_file" ]; then
-            echo "⚠️  SSH私钥 (请妥善保管，仅显示一次):"
+            echo "⚠️  SSH私钥 (请妖善保管):"
             echo "─────────────────── BEGIN PRIVATE KEY ─────────────────────"
             cat "$key_file"
             echo "──────────────────── END PRIVATE KEY ──────────────────────"
             echo ""
         fi
-    elif [ -d "$KEY_DIR" ]; then
-        echo "显示所有公钥:"
-        for pub_key in "$KEY_DIR"/*.pub; do
-            if [ -f "$pub_key" ]; then
-                echo ""
-                echo "🔑 $(basename "$pub_key"):"
-                cat "$pub_key"
-            fi
-        done
+    elif [ -z "$key_file" ] || [ "$show_private" = "false" ]; then
+        # 显示所有公钥
         echo ""
+        echo "显示所有现有公钥:"
+        if [ -d "$KEY_DIR" ]; then
+            for pub_key in "$KEY_DIR"/*.pub; do
+                if [ -f "$pub_key" ]; then
+                    echo ""
+                    echo "🔑 $(basename "$pub_key"):"
+                    cat "$pub_key"
+                fi
+            done
+            echo ""
+        else
+            echo "未找到密钥目录"
+        fi
     else
-        echo "未找到密钥文件"
+        echo "未找到指定的密钥文件"
     fi
 }
 
@@ -234,10 +284,16 @@ main() {
     
     while true; do
         show_menu
-        read -rp "请选择操作 (0-5): " choice
+        read -rp "请选择操作 (0-4): " choice
         
         case "$choice" in
             1)
+                if quick_setup; then
+                    show_keys "$KEY_FILE" "true"
+                    break
+                fi
+                ;;
+            2)
                 if [ -f "$KEY_FILE" ]; then
                     echo "警告: ED25519密钥已存在，将会覆盖现有密钥"
                     read -rp "是否继续? (y/n): " confirm
@@ -246,14 +302,10 @@ main() {
                     fi
                 fi
                 generate_keypair "ed25519"
-                configure_ssh_service
-                echo ""
-                echo "✅ 配置完成: 密码登录已禁用，仅允许密钥登录"
-                echo "⚠️  请务必妥善保管私钥，否则将无法再登录此主机！"
-                echo "🔄 复制私钥后，执行 'sudo systemctl restart sshd' 启用更改"
-                break
+                show_keys "$KEY_FILE" "true"
+                read -rp "按回车继续..." dummy
                 ;;
-            2)
+            3)
                 if [ -f "$KEY_DIR/id_rsa" ]; then
                     echo "警告: RSA密钥已存在，将会覆盖现有密钥"
                     read -rp "是否继续? (y/n): " confirm
@@ -262,36 +314,14 @@ main() {
                     fi
                 fi
                 generate_keypair "rsa"
-                configure_ssh_service
-                echo ""
-                echo "✅ 配置完成: 密码登录已禁用，仅允许密钥登录"
-                echo "⚠️  请务必妥善保管私钥，否则将无法再登录此主机！"
-                echo "🔄 复制私钥后，执行 'sudo systemctl restart sshd' 启用更改"
-                break
+                show_keys "$KEY_DIR/id_rsa" "true"
+                read -rp "按回车继续..." dummy
                 ;;
-            3)
+            4)
                 configure_ssh_service
                 echo ""
                 echo "✅ SSH服务配置完成"
                 echo "🔄 执行 'sudo systemctl restart sshd' 启用更改"
-                break
-                ;;
-            4)
-                show_keys ""
-                read -rp "按回车继续..." dummy
-                ;;
-            5)
-                echo "⚠️  警告: 即将显示私钥，请确保屏幕不被他人查看"
-                read -rp "是否继续显示私钥? (y/n): " confirm
-                if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-                    if [ -f "$KEY_FILE" ]; then
-                        show_keys "$KEY_FILE" "true"
-                    elif [ -f "$KEY_DIR/id_rsa" ]; then
-                        show_keys "$KEY_DIR/id_rsa" "true"
-                    else
-                        echo "未找到私钥文件"
-                    fi
-                fi
                 read -rp "按回车继续..." dummy
                 ;;
             0)
@@ -299,7 +329,7 @@ main() {
                 exit 0
                 ;;
             *)
-                echo "无效选择，请输入0-5之间的数字"
+                echo "无效选择，请输入0-4之间的数字"
                 ;;
         esac
     done
