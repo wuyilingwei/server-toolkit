@@ -43,82 +43,114 @@ check_for_updates() {
 
 # 执行自更新 (更新 scripts 仓库和核心文件)
 do_self_update() {
-    echo ""
-    echo -e "${COLOR_CYAN}==================== 工具包自更新 ====================${COLOR_RESET}"
-    
     local install_dir=$(get_install_dir)
     local scripts_dir="$install_dir/scripts"
     
+    # 静默检查网络连接
+    if ! curl -s -m 3 "https://api.github.com" > /dev/null 2>&1; then
+        return 1  # 网络不可用，静默失败
+    fi
+    
     # 检查 scripts 目录是否存在
     if [ ! -d "$scripts_dir/.git" ]; then
-        log_error "未找到 Git 仓库目录: $scripts_dir"
-        log_info "请重新运行部署脚本："
-        log_info "  curl -sSL https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/deploy.sh | sudo bash"
-        return 1
+        return 1  # Git目录不存在
     fi
-    
-    log_info "正在检查更新..."
-    
-    # 进入 scripts 目录
-    cd "$scripts_dir" || {
-        log_error "无法进入 scripts 目录"
-        return 1
-    }
     
     # 获取当前版本
-    local local_version=$(cat "$install_dir/config.json" | jq -r '.version // "0.0.0"')
+    local local_version=$(cat "$install_dir/config.json" | jq -r '.version // "0.0.0"' 2>/dev/null)
     
-    # 使用强制同步方式拉取最新代码
-    log_info "执行强制 Git 同步..."
+    # 进入 scripts 目录
+    cd "$scripts_dir" 2>/dev/null || return 1
     
-    # 获取远程更新
-    if ! git fetch origin main; then
-        log_error "Git fetch 失败"
-        cd "$install_dir"
-        return 1
-    fi
-    
-    # 强制重置到远程分支（丢弃本地修改）
-    log_info "重置到远程最新版本..."
-    if ! git reset --hard origin/main; then
-        log_error "Git reset 失败"
-        cd "$install_dir"
-        return 1
-    fi
-    
-    # 获取新版本
-    local remote_version=$(cat "$scripts_dir/config.json" | jq -r '.version // "0.0.0"')
-    
-    log_info "当前版本: v$local_version"
-    log_info "最新版本: v$remote_version"
-    
-    # 始终复制核心文件（即使版本号相同，文件内容可能已更新）
-    log_info "提取核心文件..."
-    cp "$scripts_dir/menu.sh" "$install_dir/"
-    cp "$scripts_dir/config.json" "$install_dir/"
-    cp "$scripts_dir/helper.sh" "$install_dir/"
-    
-    chmod +x "$install_dir/menu.sh"
-    chmod +x "$install_dir/helper.sh"
-    
-    cd "$install_dir"
-    
-    # 重新加载 helper 以使用最新函数定义
-    log_info "重新加载配置..."
-    source "$install_dir/helper.sh"
-    
-    # 重新读取更新后的配置
-    local updated_config=$(read_repo_config)
-    local updated_version=$(echo "$updated_config" | jq -r '.version // "0.0.0"')
-    
-    # 检查版本是否有变化
-    if version_ge "$local_version" "$updated_version" && [ "$local_version" = "$updated_version" ]; then
-        log_success "已是最新版本"
+    # 尝试 git fetch，如果失败则跳过
+    if git fetch origin main 2>/dev/null; then
+        # Git fetch 成功，检查是否需要更新
+        local current_commit=$(git rev-parse HEAD 2>/dev/null)
+        local remote_commit=$(git rev-parse origin/main 2>/dev/null)
+        
+        if [ "$current_commit" = "$remote_commit" ]; then
+            cd "$install_dir"
+            return 0  # 已是最新版本
+        fi
+        
+        # 有新版本，进行更新
+        echo ""
+        echo -e "${COLOR_CYAN}==================== 发现新版本，正在更新 ====================${COLOR_RESET}"
+        
+        if git reset --hard origin/main 2>/dev/null; then
+            local remote_version=$(cat "$scripts_dir/config.json" | jq -r '.version // "0.0.0"' 2>/dev/null)
+            
+            log_info "当前版本: v$local_version -> v$remote_version"
+            
+            # 复制核心文件
+            cp "$scripts_dir/menu.sh" "$install_dir/" 2>/dev/null
+            cp "$scripts_dir/config.json" "$install_dir/" 2>/dev/null  
+            cp "$scripts_dir/helper.sh" "$install_dir/" 2>/dev/null
+            
+            chmod +x "$install_dir/menu.sh" 2>/dev/null
+            chmod +x "$install_dir/helper.sh" 2>/dev/null
+            
+            cd "$install_dir"
+            
+            # 重新加载 helper
+            source "$install_dir/helper.sh" 2>/dev/null
+            
+            log_success "更新完成！新版本: v$remote_version"
+            return 0
+        else
+            cd "$install_dir"
+            return 1
+        fi
     else
-        log_success "更新完成！新版本: v$updated_version"
+        # Git fetch 失败，尝试直接下载更新
+        cd "$install_dir"
+        
+        # 检查远程版本
+        local remote_config=$(curl -s -m 5 "$RAW_REPO_URL/config.json" 2>/dev/null)
+        if [ -z "$remote_config" ] || ! echo "$remote_config" | jq -e . >/dev/null 2>&1; then
+            return 1  # 无法获取远程配置
+        fi
+        
+        local remote_version=$(echo "$remote_config" | jq -r '.version // "0.0.0"')
+        
+        # 比较版本
+        if ! version_ge "$remote_version" "$local_version" || [ "$remote_version" = "$local_version" ]; then
+            return 0  # 已是最新版本
+        fi
+        
+        # 有新版本，直接下载更新
+        echo ""
+        echo -e "${COLOR_CYAN}==================== 发现新版本，正在更新 ====================${COLOR_RESET}"
+        
+        local temp_dir="/tmp/server-toolkit-update-$$"
+        mkdir -p "$temp_dir" 2>/dev/null
+        
+        log_info "下载核心文件..."
+        if curl -s -o "$temp_dir/menu.sh" "$RAW_REPO_URL/menu.sh" 2>/dev/null && \
+           curl -s -o "$temp_dir/config.json" "$RAW_REPO_URL/config.json" 2>/dev/null && \
+           curl -s -o "$temp_dir/helper.sh" "$RAW_REPO_URL/helper.sh" 2>/dev/null; then
+            
+            log_info "当前版本: v$local_version -> v$remote_version"
+            
+            cp "$temp_dir/menu.sh" "$install_dir/" 2>/dev/null
+            cp "$temp_dir/config.json" "$install_dir/" 2>/dev/null
+            cp "$temp_dir/helper.sh" "$install_dir/" 2>/dev/null
+            
+            chmod +x "$install_dir/menu.sh" 2>/dev/null
+            chmod +x "$install_dir/helper.sh" 2>/dev/null
+            
+            rm -rf "$temp_dir" 2>/dev/null
+            
+            # 重新加载 helper
+            source "$install_dir/helper.sh" 2>/dev/null
+            
+            log_success "更新完成！新版本: v$remote_version"
+            return 0
+        else
+            rm -rf "$temp_dir" 2>/dev/null
+            return 1
+        fi
     fi
-    
-    return 0
 }
 
 # 配置 Vault URL
@@ -312,9 +344,6 @@ show_menu() {
 
 # 主循环
 main_loop() {
-    local HAS_UPDATE=false
-    local AUTO_UPDATE_DONE=false
-    
     # 读取配置
     local config=$(read_repo_config)
     
@@ -328,29 +357,17 @@ main_loop() {
         exit 1
     fi
     
-    # 自动检查更新（首次启动时）
-    if [ "$AUTO_UPDATE_DONE" = "false" ]; then
-        log_info "检查工具包更新..."
-        if check_remote_update; then
-            log_info "发现新版本！正在自动更新..."
-            if do_self_update; then
-                log_success "更新完成，正在重启菜单..."
-                exec "$0" "$@"  # 重新执行脚本
-            else
-                log_error "自动更新失败，将继续使用当前版本"
-                HAS_UPDATE=true
-            fi
-        else
-            log_info "当前已是最新版本"
-        fi
-        AUTO_UPDATE_DONE=true
-    fi
-    
     while true; do
         echo ""
         
-        if [ "$HAS_UPDATE" = "true" ]; then
-            log_warning "发现新版本可用！请使用选项 [3] 进行更新"
+        # 每次显示菜单前都强制执行更新检查
+        log_info "检查工具包更新..."
+        if do_self_update; then
+            log_success "工具包已是最新状态"
+            # 重新加载配置，以防更新后菜单发生变化
+            config=$(read_repo_config)
+        else
+            log_warning "更新检查失败，使用当前版本"
         fi
         
         show_menu "$config"
@@ -379,11 +396,14 @@ main_loop() {
                 configure_device_uuid
                 ;;
             3)
+                echo ""
+                echo -e "${COLOR_CYAN}==================== 手动更新 ====================${COLOR_RESET}"
                 if do_self_update; then
-                    log_success "更新完成，正在重启菜单..."
-                    exec "$0" "$@"  # 重新执行脚本以载入新配置
+                    log_success "手动更新完成！"
+                    # 重新加载配置以防菜单发生变化
+                    config=$(read_repo_config)
                 else
-                    log_error "更新失败"
+                    log_error "手动更新失败"
                 fi
                 ;;
             4)
