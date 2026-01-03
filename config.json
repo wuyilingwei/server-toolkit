@@ -25,6 +25,17 @@
       "version": "1.0.0"
     },
     {
+      "id": "ssh-auth",
+      "name": "SSH 密钥管理",
+      "description": "管理和配置 SSH 密钥以增强安全性",
+      "script": "system/ssh-auth.sh",
+      "min_config_version": "1.0.0",
+      "menu_id": 20,
+      "enabled": true,
+      "needs_persistence": false,
+      "version": "1.0.0"
+    },
+    {
       "id": "system-swap",
       "name": "系统 Swap 管理",
       "description": "创建、调整 Swap 交换区及 Swappiness 设置",
