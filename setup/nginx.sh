@@ -81,7 +81,7 @@ server {
     server_name _;
 
     location / {
-        return 403 '<!DOCTYPE html>
+        return 200 '<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
