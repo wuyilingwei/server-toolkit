@@ -1,5 +1,5 @@
 {
-  "version": "1.1.6",
+  "version": "1.1.7",
   "track_files": [
     "deploy.sh",
     "helper.sh",
@@ -33,7 +33,7 @@
       "menu_id": 11,
       "enabled": true,
       "needs_persistence": true,
-      "version": "1.0.2"
+      "version": "1.0.3"
     },
     {
       "id": "ssh-auth",
