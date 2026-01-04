@@ -79,6 +79,9 @@ do_self_update() {
                     
                     updated=true
                 fi
+            else
+                cd "$install_dir"
+                return 0
             fi
         fi
         cd "$install_dir"
@@ -113,6 +116,8 @@ do_self_update() {
                 else
                     rm -rf "$temp_dir" 2>/dev/null
                 fi
+            else
+                return 0
             fi
         fi
     fi
