@@ -127,6 +127,23 @@ if grep -Fxq "$EXPECTED_LINE" /etc/fstab; then
 else
     echo "[*] 更新 fstab 配置..."
     
+    # [安全断路器] 核心系统保护
+    # 1. 防止变量为空 (会导致 sed 匹配所有行)
+    if [ -z "$SWAPFILE" ]; then
+        echo "严重错误: SWAPFILE 变量为空，禁止修改 fstab！"
+        exit 1
+    fi
+    # 2. 防止操作根目录 (会导致误删根分区挂载)
+    if [ "$SWAPFILE" = "/" ]; then
+        echo "严重错误: SWAPFILE 不能为根目录 /，禁止修改 fstab！"
+        exit 1
+    fi
+    # 3. 确保是绝对路径
+    if [[ "$SWAPFILE" != /* ]]; then
+        echo "严重错误: SWAPFILE ('$SWAPFILE') 必须是绝对路径，禁止修改 fstab！"
+        exit 1
+    fi
+    
     # 备份 fstab
     cp /etc/fstab "/etc/fstab.bak.$(date +%s)"
     echo "[+] 已备份 fstab 到 /etc/fstab.bak.*"
