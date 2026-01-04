@@ -399,3 +399,166 @@ log_warning() {
 log_error() {
     echo -e "${COLOR_RED}[错误]${COLOR_RESET} $1"
 }
+
+# ============================================================================
+# 输入函数 (Input Functions)
+# ============================================================================
+
+# 输入函数 - 需要按 Enter 确认
+# 用法: result=$(input_with_enter "提示信息" "默认值" "上次设置值(可选)")
+# 返回: 用户输入值，或默认值/上次设置值
+input_with_enter() {
+    local prompt="$1"
+    local default_value="$2"
+    local previous_value="${3:-}"
+    local user_input=""
+    
+    # 构建完整提示信息
+    local full_prompt="$prompt"
+    if [ -n "$previous_value" ]; then
+        full_prompt="${full_prompt} (当前: $previous_value, 默认: $default_value): "
+    else
+        full_prompt="${full_prompt} (默认: $default_value): "
+    fi
+    
+    # 读取用户输入
+    read -r -p "$full_prompt" user_input
+    
+    # 处理输入优先级: 用户输入 > 上次设置 > 默认值
+    if [ -n "$user_input" ]; then
+        echo "$user_input"
+    elif [ -n "$previous_value" ]; then
+        echo "$previous_value"
+    else
+        echo "$default_value"
+    fi
+}
+
+# 单字符输入函数 - 不需要按 Enter (y/n 等)
+# 用法: result=$(input_single_char "提示信息" "默认值" "上次设置值(可选)")
+# 返回: 单字符输入，或默认值/上次设置值
+input_single_char() {
+    local prompt="$1"
+    local default_value="$2"
+    local previous_value="${3:-}"
+    local user_input=""
+    
+    # 构建完整提示信息
+    local full_prompt="$prompt"
+    if [ -n "$previous_value" ]; then
+        full_prompt="${full_prompt} (当前: $previous_value, 默认: $default_value): "
+    else
+        full_prompt="${full_prompt} (默认: $default_value): "
+    fi
+    
+    # 检测是否为交互式终端
+    if [ -t 0 ]; then
+        # 交互式：读取单字符输入
+        if read -n 1 -r -p "$full_prompt" user_input 2>/dev/null; then
+            echo "" # 换行
+            if [ -n "$user_input" ]; then
+                echo "$user_input"
+            elif [ -n "$previous_value" ]; then
+                echo "$previous_value"
+            else
+                echo "$default_value"
+            fi
+        else
+            # 回退到普通 read (兼容性)
+            read -r -p "$full_prompt" user_input
+            if [ -n "$user_input" ]; then
+                # 只取第一个字符
+                echo "${user_input:0:1}"
+            elif [ -n "$previous_value" ]; then
+                echo "$previous_value"
+            else
+                echo "$default_value"
+            fi
+        fi
+    else
+        # 非交互式（自动化模式）：读取整行，只取第一个字符
+        read -r user_input
+        # 去除空白字符并取第一个字符
+        user_input=$(echo "$user_input" | tr -d '[:space:]')
+        if [ -n "$user_input" ]; then
+            echo "${user_input:0:1}"
+        elif [ -n "$previous_value" ]; then
+            echo "$previous_value"
+        else
+            echo "$default_value"
+        fi
+    fi
+}
+
+# ============================================================================
+# 定时任务函数 (Cron Functions)
+# ============================================================================
+
+# 添加定时任务
+# 用法: cron_add "identifier" "time_expression" "command"
+# 例如: cron_add "cert-sync" "0 * * * *" "/path/to/script.sh"
+# 注意: 
+#   - identifier 不需要带 #，函数会自动添加
+#   - 命令会自动添加环境变量加载 (. /etc/environment;)
+#   - 要求系统使用 /etc/environment 存储环境变量
+cron_add() {
+    local identifier="$1"
+    local time_expr="$2"
+    local command="$3"
+    
+    if [ -z "$identifier" ] || [ -z "$time_expr" ] || [ -z "$command" ]; then
+        log_error "cron_add: 缺少必要参数 (identifier, time_expression, command)"
+        return 1
+    fi
+    
+    # 构建标识符标签（作为 cron 行尾注释，用于标识和移除）
+    local tag="#server-toolkit-${identifier}"
+    
+    # 构建完整的 cron 命令 (自动添加环境变量加载和标签注释)
+    # 格式: time_expr . /etc/environment; command #tag
+    local full_cmd="${time_expr} . /etc/environment; ${command} ${tag}"
+    
+    # 移除旧的任务
+    cron_remove "$identifier"
+    
+    # 添加新任务
+    local temp_cron="/tmp/cron_add_$$"
+    (crontab -l 2>/dev/null || true) > "$temp_cron"
+    echo "$full_cmd" >> "$temp_cron"
+    
+    if crontab "$temp_cron" 2>/dev/null; then
+        rm -f "$temp_cron"
+        log_success "定时任务已添加: $identifier"
+        return 0
+    else
+        rm -f "$temp_cron"
+        log_error "定时任务添加失败: $identifier"
+        return 1
+    fi
+}
+
+# 移除定时任务
+# 用法: cron_remove "identifier"
+# 例如: cron_remove "cert-sync"
+# 注意: 
+#   - identifier 不需要带 #，函数会自动添加
+#   - 安全处理空 crontab 的情况
+cron_remove() {
+    local identifier="$1"
+    
+    if [ -z "$identifier" ]; then
+        log_error "cron_remove: 缺少 identifier 参数"
+        return 1
+    fi
+    
+    # 构建标识符标签
+    local tag="#server-toolkit-${identifier}"
+    
+    # 移除所有带此标识符的行
+    local temp_cron="/tmp/cron_remove_$$"
+    # || true 确保即使没有 crontab 或所有行都被移除也不会失败
+    crontab -l 2>/dev/null | grep -v "$tag" > "$temp_cron" || true
+    crontab "$temp_cron" 2>/dev/null || true
+    rm -f "$temp_cron"
+    return 0
+}

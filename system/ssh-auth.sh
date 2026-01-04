@@ -1,6 +1,21 @@
 #!/bin/bash
 set -e
 
+# 加载 helper 函数
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HELPER_PATH="$SCRIPT_DIR/../helper.sh"
+if [ -f "$HELPER_PATH" ]; then
+    source "$HELPER_PATH"
+else
+    # 尝试从安装目录加载
+    if [ -f "/srv/server-toolkit/helper.sh" ]; then
+        source "/srv/server-toolkit/helper.sh"
+    else
+        echo "错误: 找不到 helper.sh"
+        exit 1
+    fi
+fi
+
 # 检查root权限
 if [ "$EUID" -ne 0 ]; then
     echo "错误: 需要root权限执行此脚本"
@@ -11,8 +26,7 @@ fi
 USER_NAME=$(whoami)
 if [ "$USER_NAME" = "root" ]; then
     echo "警告: 正在为root用户配置SSH密钥"
-    read -rp "是否继续? (y/n, 默认n): " continue_root
-    continue_root="${continue_root:-n}"
+    continue_root=$(input_single_char "是否继续? (y/n)" "n")
     if [ "$continue_root" != "y" ] && [ "$continue_root" != "Y" ]; then
         echo "操作已取消"
         exit 0
@@ -23,11 +37,10 @@ else
     echo "当前以root身份运行，请选择要配置SSH密钥的用户:"
     echo "1) root用户"
     echo "2) 其他用户"
-    read -rp "请选择 (1-2, 默认1): " user_choice
-    user_choice="${user_choice:-1}"
+    user_choice=$(input_with_enter "请选择 (1-2)" "1")
     
     if [ "$user_choice" = "2" ]; then
-        read -rp "请输入用户名: " target_user
+        target_user=$(input_with_enter "请输入用户名" "")
         if ! id "$target_user" &>/dev/null; then
             echo "错误: 用户 $target_user 不存在"
             exit 1
@@ -134,8 +147,7 @@ quick_setup() {
             echo "公钥内容: $(cat "$KEY_FILE.pub" 2>/dev/null || echo '读取失败')"
         fi
         echo ""
-        read -rp "是否继续覆盖? (y/n, 默认n): " confirm
-        confirm="${confirm:-n}"
+        confirm=$(input_single_char "是否继续覆盖? (y/n)" "n")
         if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
             echo "操作已取消"
             return 1
@@ -290,7 +302,7 @@ main() {
     
     while true; do
         show_menu
-        read -rp "请选择操作 (0-4): " choice
+        choice=$(input_with_enter "请选择操作 (0-4)" "0")
         
         case "$choice" in
             1)
@@ -302,33 +314,33 @@ main() {
             2)
                 if [ -f "$KEY_FILE" ]; then
                     echo "警告: ED25519密钥已存在，将会覆盖现有密钥"
-                    read -rp "是否继续? (y/n): " confirm
+                    confirm=$(input_single_char "是否继续? (y/n)" "n")
                     if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
                         continue
                     fi
                 fi
                 generate_keypair "ed25519"
                 show_keys "$KEY_FILE" "true"
-                read -rp "按回车继续..." dummy
+                input_with_enter "按回车继续..." "" >/dev/null
                 ;;
             3)
                 if [ -f "$KEY_DIR/id_rsa" ]; then
                     echo "警告: RSA密钥已存在，将会覆盖现有密钥"
-                    read -rp "是否继续? (y/n): " confirm
+                    confirm=$(input_single_char "是否继续? (y/n)" "n")
                     if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
                         continue
                     fi
                 fi
                 generate_keypair "rsa"
                 show_keys "$KEY_DIR/id_rsa" "true"
-                read -rp "按回车继续..." dummy
+                input_with_enter "按回车继续..." "" >/dev/null
                 ;;
             4)
                 configure_ssh_service
                 echo ""
                 echo "✅ SSH服务配置完成"
                 echo "🔄 执行 'sudo systemctl restart sshd' 启用更改"
-                read -rp "按回车继续..." dummy
+                input_with_enter "按回车继续..." "" >/dev/null
                 ;;
             0)
                 echo "退出SSH密钥管理工具"

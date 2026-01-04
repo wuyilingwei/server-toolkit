@@ -14,6 +14,14 @@ if ! cd "$WORKDIR" 2>/dev/null; then
 fi
 # ====================================
 
+# 加载 helper 函数
+if [ -f "$WORKDIR/helper.sh" ]; then
+    source "$WORKDIR/helper.sh"
+else
+    echo "错误: 找不到 helper.sh"
+    exit 1
+fi
+
 # Default Configuration
 # Storage directory for persistent data
 STORAGE_DIR="$WORKDIR/storage/cert"
@@ -25,18 +33,7 @@ mkdir -p "$CERT_LOCAL_DIR"
 SYNC_SCRIPT_PATH="$STORAGE_DIR/worker.sh"
 LOG_FILE="$STORAGE_DIR/sync.log"
 
-# Color codes
-COLOR_RESET="\033[0m"
-COLOR_GREEN="\033[1;32m"
-COLOR_YELLOW="\033[1;33m"
-COLOR_RED="\033[1;31m"
-COLOR_CYAN="\033[1;36m"
-COLOR_BLUE="\033[1;34m"
-
-log_info() { echo -e "${COLOR_CYAN}[INFO]${COLOR_RESET} $1"; }
-log_success() { echo -e "${COLOR_GREEN}[SUCCESS]${COLOR_RESET} $1"; }
-log_error() { echo -e "${COLOR_RED}[ERROR]${COLOR_RESET} $1"; }
-log_warning() { echo -e "${COLOR_YELLOW}[WARNING]${COLOR_RESET} $1"; }
+# Color codes and log functions are already defined in helper.sh
 
 # 1. Environment & UUID Check
 # Load environment variables
@@ -48,18 +45,13 @@ fi
 if [ -z "$SYS_DEVICE_UUID" ]; then
     echo ""
     echo -e "${COLOR_YELLOW}未检测到设备 UUID (SYS_DEVICE_UUID)${COLOR_RESET}"
-    echo -n "请输入您的 Vault Token (UUID): "
-    read user_token
+    user_token=$(input_with_enter "请输入您的 Vault Token (UUID)" "")
     echo ""
     
     if [ -n "$user_token" ]; then
         # Persist to /etc/environment
-        if ! grep -q "SYS_DEVICE_UUID" /etc/environment; then
-            echo "SYS_DEVICE_UUID=\"$user_token\"" >> /etc/environment
-        else
-            sed -i "s/^SYS_DEVICE_UUID=.*/SYS_DEVICE_UUID=\"$user_token\"/" /etc/environment
-        fi
-        export SYS_DEVICE_UUID="$user_token"
+        # set_config_value also exports the variable to current environment
+        set_config_value "SYS_DEVICE_UUID" "$user_token"
         log_success "UUID 已保存"
     else
         log_error "未输入 Token，无法继续"
@@ -79,10 +71,9 @@ echo ""
 echo -e "${COLOR_CYAN}=== 证书目录权限设置 ===${COLOR_RESET}"
 echo "证书将存储在: $CERT_LOCAL_DIR"
 echo -e "${COLOR_YELLOW}建议设置目录权限为 700 (仅所有者可读写执行) 以保护证书安全${COLOR_RESET}"
-echo -n "是否设置 cert/local 目录权限为 700? (y/n，默认: y，Enter确认): "
-read set_perm
+set_perm=$(input_single_char "是否设置 cert/local 目录权限为 700? (y/n)" "y")
 
-if [ -z "$set_perm" ] || [ "$set_perm" = "y" ] || [ "$set_perm" = "Y" ]; then
+if [ "$set_perm" = "y" ] || [ "$set_perm" = "Y" ]; then
     chmod 700 "$CERT_LOCAL_DIR"
     log_success "已设置 cert/local 目录权限为 700"
 else
@@ -212,15 +203,15 @@ done
 if [ -z "$prod_available_list" ]; then
     echo -e "${COLOR_RED}没有可用的生产证书${COLOR_RESET}"
     echo ""
+    # 没有可用证书时设置为空
+    prod_selection=""
 else
     echo ""
     if [ -n "$current_prod_domains" ]; then
-        echo -e "${COLOR_CYAN}当前已配置的生产证书: $current_prod_domains${COLOR_RESET}"
-        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，Enter保持不变): "
+        prod_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "" "$current_prod_domains")
     else
-        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
+        prod_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "")
     fi
-    read prod_selection
 fi
 
 PROD_DOMAINS=""
@@ -283,15 +274,15 @@ done
 if [ -z "$cf_available_list" ]; then
     echo -e "${COLOR_RED}没有可用的源站证书${COLOR_RESET}"
     echo ""
+    # 没有可用证书时设置为空
+    cf_selection=""
 else
     echo ""
     if [ -n "$current_cf_domains" ]; then
-        echo -e "${COLOR_CYAN}当前已配置的源站证书: $current_cf_domains${COLOR_RESET}"
-        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，Enter保持不变): "
+        cf_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "" "$current_cf_domains")
     else
-        echo -n "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有，留空跳过): "
+        cf_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "")
     fi
-    read cf_selection
 fi
 
 CF_DOMAINS=""
@@ -358,8 +349,7 @@ if [ -z "$PROD_DOMAINS" ] && [ -z "$CF_DOMAINS" ]; then
     echo "2. 检查 Vault 中是否存在所需的证书密钥"
     echo "3. 确认您的设备 UUID 和 Vault URL 配置正确"
     echo ""
-    echo -n "是否要继续配置符号链接和定时任务? (y/n, 默认: n): "
-    read continue_setup
+    continue_setup=$(input_single_char "是否要继续配置符号链接和定时任务? (y/n)" "n")
     
     if [ "$continue_setup" != "y" ] && [ "$continue_setup" != "Y" ]; then
         log_info "用户选择退出"
@@ -379,20 +369,12 @@ if [ -f "$CONFIG_FILE" ]; then
     current_reload_cmd=$(jq -r '.reload_command // ""' "$CONFIG_FILE" 2>/dev/null)
 fi
 
-if [ -n "$current_reload_cmd" ]; then
-    echo -n "请输入证书更新后的重载命令 (当前: $current_reload_cmd，Enter保持不变): "
-else
-    echo -n "请输入证书更新后的重载命令 (推荐: nginx -t && nginx -s reload): "
-fi
-read reload_cmd
+# 使用 input_with_enter 函数
+reload_cmd=$(input_with_enter "请输入证书更新后的重载命令 (推荐: nginx -t && nginx -s reload)" "" "$current_reload_cmd")
 
 # 处理重载命令配置
 RELOAD_COMMAND=""
-if [ -z "$reload_cmd" ] && [ -n "$current_reload_cmd" ]; then
-    # 空选择且有现有配置，保持不变
-    RELOAD_COMMAND="$current_reload_cmd"
-    log_success "保持现有的重载命令: $current_reload_cmd"
-elif [ -n "$reload_cmd" ]; then
+if [ -n "$reload_cmd" ]; then
     RELOAD_COMMAND="$reload_cmd"
     log_success "重载命令已设置: $reload_cmd"
 else
@@ -413,36 +395,26 @@ if [ -f "$CONFIG_FILE" ]; then
     current_nginx_ssl=$(jq -r '.symlinks.nginx_ssl // false' "$CONFIG_FILE" 2>/dev/null)
 fi
 
-if [ "$current_etc_ssl" = "true" ]; then
-    echo -n "是否创建 /etc/ssl 符号链接? (当前: 已启用, y/n, Enter保持不变): "
-else
-    echo -n "是否创建 /etc/ssl 符号链接? (y/n，默认: n，Enter确认): "
-fi
-read link_etc_ssl
+# 将 true/false 转换为 y/n 以作为上次设置
+prev_etc_ssl=""
+[ "$current_etc_ssl" = "true" ] && prev_etc_ssl="y"
+
+link_etc_ssl=$(input_single_char "是否创建 /etc/ssl 符号链接? (y/n)" "n" "$prev_etc_ssl")
 CREATE_ETC_SSL_LINK="false"
-if [ -z "$link_etc_ssl" ] && [ "$current_etc_ssl" = "true" ]; then
-    # 空选择且已启用，保持不变
-    CREATE_ETC_SSL_LINK="true"
-    log_success "保持 /etc/ssl 符号链接已启用"
-elif [ "$link_etc_ssl" = "y" ] || [ "$link_etc_ssl" = "Y" ]; then
+if [ "$link_etc_ssl" = "y" ] || [ "$link_etc_ssl" = "Y" ]; then
     CREATE_ETC_SSL_LINK="true"
     log_success "将创建 /etc/ssl 符号链接"
 else
     log_info "不创建 /etc/ssl 符号链接"
 fi
 
-if [ "$current_nginx_ssl" = "true" ]; then
-    echo -n "是否创建 /etc/nginx/ssl 符号链接? (当前: 已启用, y/n, Enter保持不变): "
-else
-    echo -n "是否创建 /etc/nginx/ssl 符号链接? (y/n，默认: n，Enter确认): "
-fi
-read link_nginx_ssl
+# 将 true/false 转换为 y/n 以作为上次设置
+prev_nginx_ssl=""
+[ "$current_nginx_ssl" = "true" ] && prev_nginx_ssl="y"
+
+link_nginx_ssl=$(input_single_char "是否创建 /etc/nginx/ssl 符号链接? (y/n)" "n" "$prev_nginx_ssl")
 CREATE_NGINX_SSL_LINK="false"
-if [ -z "$link_nginx_ssl" ] && [ "$current_nginx_ssl" = "true" ]; then
-    # 空选择且已启用，保持不变
-    CREATE_NGINX_SSL_LINK="true"
-    log_success "保持 /etc/nginx/ssl 符号链接已启用"
-elif [ "$link_nginx_ssl" = "y" ] || [ "$link_nginx_ssl" = "Y" ]; then
+if [ "$link_nginx_ssl" = "y" ] || [ "$link_nginx_ssl" = "Y" ]; then
     CREATE_NGINX_SSL_LINK="true"
     log_success "将创建 /etc/nginx/ssl 符号链接"
 else
@@ -511,20 +483,9 @@ sed -i "s|CERT_DIR=.*|CERT_DIR=\"$CERT_LOCAL_DIR\"|g" "$SYNC_SCRIPT_PATH"
 
 chmod +x "$SYNC_SCRIPT_PATH"
 
-# 10. Setup Cron Job with #server-toolkit-cert tag
+# 10. Setup Cron Job using new cron_add function
 log_info "配置定时任务 (每小时执行一次)..."
-TAG="#server-toolkit-cert"
-CRON_CMD="0 * * * * . /etc/environment; $SYNC_SCRIPT_PATH >> $LOG_FILE 2>&1 $TAG"
-
-# Remove all old cert jobs (with server-toolkit-cert tag)
-crontab -l 2>/dev/null | grep -v "#server-toolkit-cert" > /tmp/cron.tmp || true
-
-# Add new job
-echo "$CRON_CMD" >> /tmp/cron.tmp
-crontab /tmp/cron.tmp
-rm /tmp/cron.tmp
-
-log_success "定时任务已配置"
+cron_add "cert" "0 * * * *" "$SYNC_SCRIPT_PATH >> $LOG_FILE 2>&1"
 
 # 11. Run Initial Sync
 log_info "正在执行首次同步..."

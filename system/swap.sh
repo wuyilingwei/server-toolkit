@@ -1,6 +1,21 @@
 #!/bin/bash
 set -e
 
+# 加载 helper 函数
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HELPER_PATH="$SCRIPT_DIR/../helper.sh"
+if [ -f "$HELPER_PATH" ]; then
+    source "$HELPER_PATH"
+else
+    # 尝试从安装目录加载
+    if [ -f "/srv/server-toolkit/helper.sh" ]; then
+        source "/srv/server-toolkit/helper.sh"
+    else
+        echo "错误: 找不到 helper.sh"
+        exit 1
+    fi
+fi
+
 SWAPFILE="${SWAPFILE:-/swapfile}"
 SIZE="${1:-}"
 
@@ -30,8 +45,7 @@ echo ""
 
 # 1. 询问交换区大小
 if [ -z "$SIZE" ]; then 
-    read -rp "目标交换区大小(如 8G/512M，默认 2G): " SIZE
-    SIZE="${SIZE:-2G}"
+    SIZE=$(input_with_enter "目标交换区大小(如 8G/512M)" "2G")
 fi
 
 parse(){ 
@@ -52,7 +66,13 @@ MIB="$(parse "$SIZE")"
 # 2. 询问 Swappiness 并介绍
 echo -e "\n[?] 什么是 Swappiness? (0-100)\n    - 较小值(如 10): 优先使用物理内存，减少磁盘IO，适合机械硬盘或低性能云硬盘。\n    - 较大值(如 60): 积极将冷数据换出到Swap，腾出内存给Cache，适合高并发场景。"
 CUR_SWAP=$(cat /proc/sys/vm/swappiness)
-read -rp "设置 Swappiness (当前 $CUR_SWAP, 建议 10, 默认不修改): " NEW_SWAP
+NEW_SWAP=$(input_with_enter "设置 Swappiness (建议 10)" "" "$CUR_SWAP")
+
+# 特殊处理：如果输入等于当前值，则视为不修改（避免不必要的系统调用）
+# 这种情况发生在用户按 Enter 使用当前值作为"默认"时
+if [ "$NEW_SWAP" = "$CUR_SWAP" ]; then
+    NEW_SWAP=""
+fi
 
 # 最终确认
 echo ""
@@ -67,7 +87,7 @@ else
     echo "Swappiness: 保持不变 (当前 $CUR_SWAP)"
 fi
 echo ""
-read -rp "确认进行以上操作? (y/n): " confirm
+confirm=$(input_single_char "确认进行以上操作? (y/n)" "n")
 if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
     echo "已取消操作"
     exit 0
