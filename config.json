@@ -1,5 +1,10 @@
 {
-  "version": "1.1.0",
+  "version": "1.1.1",
+  "track_files": [
+    "deploy.sh",
+    "helper.sh",
+    "menu.sh"
+  ],
   "min_config_version": "1.0.0",
   "modules": [
     {
@@ -7,6 +12,9 @@
       "name": "SSH 安全防护部署",
       "description": "基于 Vault 白名单的 SSH 安全防护系统",
       "script": "ssh-security/deploy.sh",
+      "track_files": [
+        "ssh-security/**"
+      ],
       "min_config_version": "1.0.0",
       "menu_id": 10,
       "enabled": true,
@@ -18,6 +26,9 @@
       "name": "证书同步管理",
       "description": "从 Vault 同步 SSL 证书 (Standard/CF Origin)",
       "script": "cert/deploy.sh",
+      "track_files": [
+        "cert/**"
+      ],
       "min_config_version": "1.1.0",
       "menu_id": 11,
       "enabled": true,
@@ -29,6 +40,9 @@
       "name": "SSH 密钥管理",
       "description": "管理和配置 SSH 密钥以增强安全性",
       "script": "system/ssh-auth.sh",
+      "track_files": [
+        "system/ssh-auth.sh"
+      ],
       "min_config_version": "1.0.0",
       "menu_id": 20,
       "enabled": true,
@@ -40,6 +54,9 @@
       "name": "系统 Swap 管理",
       "description": "创建、调整 Swap 交换区及 Swappiness 设置",
       "script": "system/swap.sh",
+      "track_files": [
+        "system/swap.sh"
+      ],
       "min_config_version": "1.0.0",
       "menu_id": 21,
       "enabled": true,
@@ -51,6 +68,9 @@
       "name": "systemd 日志优化",
       "description": "清理和限制 systemd 日志大小，释放磁盘空间",
       "script": "system/maxSystemd.sh",
+      "track_files": [
+        "system/maxSystemd.sh"
+      ],
       "min_config_version": "1.0.0",
       "menu_id": 22,
       "enabled": true,
@@ -62,6 +82,9 @@
       "name": "Nginx 部署安装",
       "description": "安装 Nginx 网站服务器并配置默认页面",
       "script": "setup/nginx.sh",
+      "track_files": [
+        "setup/nginx.sh"
+      ],
       "min_config_version": "1.0.0",
       "menu_id": 31,
       "enabled": true,
@@ -73,6 +96,9 @@
       "name": "Docker 部署安装",
       "description": "安装 Docker 容器引擎及相关工具",
       "script": "setup/docker.sh",
+      "track_files": [
+        "setup/docker.sh"
+      ],
       "min_config_version": "1.0.0",
       "menu_id": 32,
       "enabled": true,

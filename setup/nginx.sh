@@ -72,23 +72,14 @@ else
     echo "✅ 已添加 server_tokens off 到 nginx.conf"
 fi
 
-echo "🛠️ Write custom default site configuration..."
-cat <<'EOF' | sudo tee /etc/nginx/sites-available/00-default > /dev/null
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
+echo "Create unified error page snippet..."
+sudo mkdir -p /etc/nginx/snippets
+cat <<'EOF' | sudo tee /etc/nginx/snippets/error_denied.conf > /dev/null
+# 统一的错误页面定义
+error_page 403 /denied.html;
 
-    server_name _;
-
-    # 1. 所有的请求都抛出 403 错误
-    error_page 403 /denied.html;
-    location / {
-    return 403;
-    }
-
-    # 2. 定义 403 错误显示的具体内容
-    location = /denied.html {
-    internal; # 确保外部不能直接访问这个路径
+location = /denied.html {
+    internal;
     add_header Content-Type text/html;
     return 200 '<!DOCTYPE html>
 <html lang="en">
@@ -127,6 +118,22 @@ server {
     <p>If you believe this is an error, please contact the site administrator.</p>
 </body>
 </html>';
+}
+EOF
+
+echo "🛠️ Write custom default site configuration..."
+cat <<'EOF' | sudo tee /etc/nginx/sites-available/00-default > /dev/null
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name _;
+
+    # 引用统一错误页配置
+    include /etc/nginx/snippets/error_denied.conf;
+
+    location / {
+        return 403;
     }
 }
 
