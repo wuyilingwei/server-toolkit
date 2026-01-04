@@ -61,7 +61,7 @@
       "menu_id": 21,
       "enabled": true,
       "needs_persistence": false,
-      "version": "1.0.3"
+      "version": "1.0.4"
     },
     {
       "id": "system-max-systemd",
