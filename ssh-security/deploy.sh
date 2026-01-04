@@ -13,16 +13,17 @@ if ! cd "$WORKDIR" 2>/dev/null; then
 fi
 # ====================================
 
+# 加载 helper 函数
+if [ -f "$WORKDIR/helper.sh" ]; then
+    source "$WORKDIR/helper.sh"
+else
+    echo "错误: 找不到 helper.sh"
+    exit 1
+fi
+
 # Storage directory for persistent data
 STORAGE_DIR="$WORKDIR/storage/ssh-security"
 mkdir -p "$STORAGE_DIR"
-
-# Color codes
-COLOR_RESET="\033[0m"
-COLOR_BLUE="\033[1;34m"
-COLOR_GREEN="\033[1;32m"
-COLOR_YELLOW="\033[1;33m"
-COLOR_RED="\033[1;31m"
 
 echo -e "${COLOR_BLUE}========================================${COLOR_RESET}"
 echo -e "${COLOR_BLUE}      SSH Security 部署脚本${COLOR_RESET}"
@@ -80,12 +81,7 @@ echo -e "${COLOR_GREEN}✓ Worker 脚本已部署到: $WORKER_SCRIPT${COLOR_RESE
 
 # 4. 管理 Crontab
 echo -e "\n${COLOR_BLUE}步骤 4: 配置定时任务${COLOR_RESET}"
-crontab -l 2>/dev/null | grep -v "#ssh-security" > /tmp/cron_tmp
-echo "*/10 * * * * . /etc/environment; /bin/sh $WORKER_SCRIPT >> $LOG_FILE 2>&1 #ssh-security" >> /tmp/cron_tmp
-crontab /tmp/cron_tmp
-rm /tmp/cron_tmp
-
-echo -e "${COLOR_GREEN}✓ 定时任务已配置（每10分钟执行一次）${COLOR_RESET}"
+cron_add "ssh-security" "*/10 * * * *" "/bin/sh $WORKER_SCRIPT >> $LOG_FILE 2>&1"
 
 # 5. 立即执行首次同步
 echo -e "\n${COLOR_BLUE}步骤 5: 执行首次同步${COLOR_RESET}"
@@ -104,8 +100,8 @@ echo -e "${COLOR_GREEN}========================================${COLOR_RESET}"
 # 6. 交互式卸载 Fail2ban
 echo -e "\n${COLOR_BLUE}可选操作: 清理旧策略${COLOR_RESET}"
 if dpkg -l | grep -q fail2ban; then
-    read -p "检测到 Fail2ban 已安装，是否需要卸载以清理旧策略? (y/n): " confirm
-    if [ "$confirm" = "y" ]; then
+    confirm=$(input_single_char "检测到 Fail2ban 已安装，是否需要卸载以清理旧策略? (y/n)" "n")
+    if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
         apt purge fail2ban -y && apt autoremove -y
         echo -e "${COLOR_GREEN}Fail2ban 已卸载${COLOR_RESET}"
     else

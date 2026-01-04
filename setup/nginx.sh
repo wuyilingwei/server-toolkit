@@ -1,6 +1,21 @@
 #!/bin/bash
 set -e
 
+# 加载 helper 函数
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HELPER_PATH="$SCRIPT_DIR/../helper.sh"
+if [ -f "$HELPER_PATH" ]; then
+    source "$HELPER_PATH"
+else
+    # 尝试从安装目录加载
+    if [ -f "/srv/server-toolkit/helper.sh" ]; then
+        source "/srv/server-toolkit/helper.sh"
+    else
+        echo "错误: 找不到 helper.sh"
+        exit 1
+    fi
+fi
+
 # 检查root权限
 if [ "$EUID" -ne 0 ]; then
     echo "错误: 需要root权限执行此脚本"
@@ -51,10 +66,8 @@ fi
 echo "🧹 Remove default site configuration (already backed up)..."
 
 echo "🧹 Remove rsync + reload cron tasks (by tag) ..."
-TAG="#rsync-nginx-default"
-crontab -l 2>/dev/null | grep -v "$TAG" > /tmp/clean_cron || true
-crontab /tmp/clean_cron 2>/dev/null || true
-rm -f /tmp/clean_cron
+# 使用新的 cron_remove 函数
+cron_remove "rsync-nginx-default"
 
 echo "🔒 Configure nginx security settings..."
 # 配置 server_tokens off，确保没有重复且正确设置
