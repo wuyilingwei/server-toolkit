@@ -203,6 +203,7 @@ done
 if [ -z "$prod_available_list" ]; then
     echo -e "${COLOR_RED}没有可用的生产证书${COLOR_RESET}"
     echo ""
+    # 没有可用证书时设置为空
     prod_selection=""
 else
     echo ""
@@ -273,6 +274,7 @@ done
 if [ -z "$cf_available_list" ]; then
     echo -e "${COLOR_RED}没有可用的源站证书${COLOR_RESET}"
     echo ""
+    # 没有可用证书时设置为空
     cf_selection=""
 else
     echo ""

@@ -68,7 +68,8 @@ echo -e "\n[?] 什么是 Swappiness? (0-100)\n    - 较小值(如 10): 优先使
 CUR_SWAP=$(cat /proc/sys/vm/swappiness)
 NEW_SWAP=$(input_with_enter "设置 Swappiness (建议 10)" "" "$CUR_SWAP")
 
-# 如果输入等于当前值，则视为不修改（避免不必要的修改）
+# 特殊处理：如果输入等于当前值，则视为不修改（避免不必要的系统调用）
+# 这种情况发生在用户按 Enter 使用当前值作为"默认"时
 if [ "$NEW_SWAP" = "$CUR_SWAP" ]; then
     NEW_SWAP=""
 fi

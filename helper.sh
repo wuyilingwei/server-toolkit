@@ -500,6 +500,7 @@ input_single_char() {
 # 注意: 
 #   - identifier 不需要带 #，函数会自动添加
 #   - 命令会自动添加环境变量加载 (. /etc/environment;)
+#   - 要求系统使用 /etc/environment 存储环境变量
 cron_add() {
     local identifier="$1"
     local time_expr="$2"
@@ -539,7 +540,9 @@ cron_add() {
 # 移除定时任务
 # 用法: cron_remove "identifier"
 # 例如: cron_remove "cert-sync"
-# 注意: identifier 不需要带 #，函数会自动添加
+# 注意: 
+#   - identifier 不需要带 #，函数会自动添加
+#   - 安全处理空 crontab 的情况
 cron_remove() {
     local identifier="$1"
     
@@ -553,6 +556,7 @@ cron_remove() {
     
     # 移除所有带此标识符的行
     local temp_cron="/tmp/cron_remove_$$"
+    # || true 确保即使没有 crontab 或所有行都被移除也不会失败
     crontab -l 2>/dev/null | grep -v "$tag" > "$temp_cron" || true
     crontab "$temp_cron" 2>/dev/null || true
     rm -f "$temp_cron"
