@@ -33,7 +33,7 @@
       "menu_id": 11,
       "enabled": true,
       "needs_persistence": true,
-      "version": "1.0.0"
+      "version": "1.0.1"
     },
     {
       "id": "ssh-auth",
