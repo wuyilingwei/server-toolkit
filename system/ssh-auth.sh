@@ -82,6 +82,9 @@ check_existing_keys() {
         if [ "$has_rsa" = true ]; then
             echo "🔑 RSA 密钥:"
             echo "   私钥: $KEY_DIR/id_rsa"
+            if [ -f "$KEY_DIR/id_rsa" ]; then
+                echo "   内容: $(cat "$KEY_DIR/id_rsa.pub" 2>/dev/null || echo '读取失败')"
+            fi
             echo "   公钥: $KEY_DIR/id_rsa.pub"
             if [ -f "$KEY_DIR/id_rsa.pub" ]; then
                 echo "   内容: $(cat "$KEY_DIR/id_rsa.pub" 2>/dev/null || echo '读取失败')"
