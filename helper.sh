@@ -451,22 +451,36 @@ input_single_char() {
         full_prompt="${full_prompt} (默认: $default_value): "
     fi
     
-    # 读取单字符输入 (如果支持 -n 选项)
-    # 注意: 某些 shell 不支持 read -n，所以提供回退方案
-    if read -n 1 -r -p "$full_prompt" user_input 2>/dev/null; then
-        echo "" # 换行
-        if [ -n "$user_input" ]; then
-            echo "$user_input"
-        elif [ -n "$previous_value" ]; then
-            echo "$previous_value"
+    # 检测是否为交互式终端
+    if [ -t 0 ]; then
+        # 交互式：读取单字符输入
+        if read -n 1 -r -p "$full_prompt" user_input 2>/dev/null; then
+            echo "" # 换行
+            if [ -n "$user_input" ]; then
+                echo "$user_input"
+            elif [ -n "$previous_value" ]; then
+                echo "$previous_value"
+            else
+                echo "$default_value"
+            fi
         else
-            echo "$default_value"
+            # 回退到普通 read (兼容性)
+            read -r -p "$full_prompt" user_input
+            if [ -n "$user_input" ]; then
+                # 只取第一个字符
+                echo "${user_input:0:1}"
+            elif [ -n "$previous_value" ]; then
+                echo "$previous_value"
+            else
+                echo "$default_value"
+            fi
         fi
     else
-        # 回退到普通 read (兼容性)
-        read -r -p "$full_prompt" user_input
+        # 非交互式（自动化模式）：读取整行，只取第一个字符
+        read -r user_input
+        # 去除空白字符并取第一个字符
+        user_input=$(echo "$user_input" | tr -d '[:space:]')
         if [ -n "$user_input" ]; then
-            # 只取第一个字符
             echo "${user_input:0:1}"
         elif [ -n "$previous_value" ]; then
             echo "$previous_value"
@@ -538,13 +552,8 @@ cron_remove() {
     
     # 移除所有带此标识符的行
     local temp_cron="/tmp/cron_remove_$$"
-    if crontab -l 2>/dev/null | grep -v "$tag" > "$temp_cron"; then
-        crontab "$temp_cron" 2>/dev/null || true
-        rm -f "$temp_cron"
-        return 0
-    else
-        # 如果 crontab 为空或 grep 失败，创建空 crontab
-        rm -f "$temp_cron"
-        return 0
-    fi
+    crontab -l 2>/dev/null | grep -v "$tag" > "$temp_cron" || true
+    crontab "$temp_cron" 2>/dev/null || true
+    rm -f "$temp_cron"
+    return 0
 }
