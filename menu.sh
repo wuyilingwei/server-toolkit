@@ -51,106 +51,111 @@ do_self_update() {
         return 1  # 网络不可用，静默失败
     fi
     
+    # 保存旧配置用于对比
+    local old_config=$(cat "$install_dir/config.json" 2>/dev/null || echo "{}")
+    local updated=false
+    
     # 检查 scripts 目录是否存在
-    if [ ! -d "$scripts_dir/.git" ]; then
-        return 1  # Git目录不存在
-    fi
-    
-    # 获取当前版本
-    local local_version=$(cat "$install_dir/config.json" | jq -r '.version // "0.0.0"' 2>/dev/null)
-    
-    # 进入 scripts 目录
-    cd "$scripts_dir" 2>/dev/null || return 1
-    
-    # 尝试 git fetch，如果失败则跳过
-    if git fetch origin main 2>/dev/null; then
-        # Git fetch 成功，检查是否需要更新
-        local current_commit=$(git rev-parse HEAD 2>/dev/null)
-        local remote_commit=$(git rev-parse origin/main 2>/dev/null)
+    if [ -d "$scripts_dir/.git" ]; then
+        # Git 模式更新
+        cd "$scripts_dir" 2>/dev/null || return 1
         
-        if [ "$current_commit" = "$remote_commit" ]; then
-            cd "$install_dir"
-            return 0  # 已是最新版本
+        if git fetch origin main 2>/dev/null; then
+            local current_commit=$(git rev-parse HEAD 2>/dev/null)
+            local remote_commit=$(git rev-parse origin/main 2>/dev/null)
+            
+            if [ "$current_commit" != "$remote_commit" ]; then
+                echo ""
+                echo -e "${COLOR_CYAN}==================== 发现新版本，正在更新 ====================${COLOR_RESET}"
+                
+                if git reset --hard origin/main 2>/dev/null; then
+                    # 复制核心文件
+                    cp "$scripts_dir/menu.sh" "$install_dir/" 2>/dev/null
+                    cp "$scripts_dir/config.json" "$install_dir/" 2>/dev/null  
+                    cp "$scripts_dir/helper.sh" "$install_dir/" 2>/dev/null
+                    
+                    chmod +x "$install_dir/menu.sh" 2>/dev/null
+                    chmod +x "$install_dir/helper.sh" 2>/dev/null
+                    
+                    updated=true
+                fi
+            fi
         fi
-        
-        # 有新版本，进行更新
-        echo ""
-        echo -e "${COLOR_CYAN}==================== 发现新版本，正在更新 ====================${COLOR_RESET}"
-        
-        if git reset --hard origin/main 2>/dev/null; then
-            local remote_version=$(cat "$scripts_dir/config.json" | jq -r '.version // "0.0.0"' 2>/dev/null)
-            
-            log_info "当前版本: v$local_version -> v$remote_version"
-            
-            # 复制核心文件
-            cp "$scripts_dir/menu.sh" "$install_dir/" 2>/dev/null
-            cp "$scripts_dir/config.json" "$install_dir/" 2>/dev/null  
-            cp "$scripts_dir/helper.sh" "$install_dir/" 2>/dev/null
-            
-            chmod +x "$install_dir/menu.sh" 2>/dev/null
-            chmod +x "$install_dir/helper.sh" 2>/dev/null
-            
-            cd "$install_dir"
-            
-            # 重新加载 helper
-            source "$install_dir/helper.sh" 2>/dev/null
-            
-            log_success "更新完成！新版本: v$remote_version"
-            return 0
-        else
-            cd "$install_dir"
-            return 1
-        fi
-    else
-        # Git fetch 失败，尝试直接下载更新
         cd "$install_dir"
-        
-        # 检查远程版本
+    else
+        # 直接下载模式更新
+        local local_version=$(echo "$old_config" | jq -r '.version // "0.0.0"')
         local remote_config=$(curl -s -m 5 "$RAW_REPO_URL/config.json" 2>/dev/null)
-        if [ -z "$remote_config" ] || ! echo "$remote_config" | jq -e . >/dev/null 2>&1; then
-            return 1  # 无法获取远程配置
-        fi
         
-        local remote_version=$(echo "$remote_config" | jq -r '.version // "0.0.0"')
-        
-        # 比较版本
-        if ! version_ge "$remote_version" "$local_version" || [ "$remote_version" = "$local_version" ]; then
-            return 0  # 已是最新版本
-        fi
-        
-        # 有新版本，直接下载更新
-        echo ""
-        echo -e "${COLOR_CYAN}==================== 发现新版本，正在更新 ====================${COLOR_RESET}"
-        
-        local temp_dir="/tmp/server-toolkit-update-$$"
-        mkdir -p "$temp_dir" 2>/dev/null
-        
-        log_info "下载核心文件..."
-        if curl -s -o "$temp_dir/menu.sh" "$RAW_REPO_URL/menu.sh" 2>/dev/null && \
-           curl -s -o "$temp_dir/config.json" "$RAW_REPO_URL/config.json" 2>/dev/null && \
-           curl -s -o "$temp_dir/helper.sh" "$RAW_REPO_URL/helper.sh" 2>/dev/null; then
+        if [ -n "$remote_config" ] && echo "$remote_config" | jq -e . >/dev/null 2>&1; then
+            local remote_version=$(echo "$remote_config" | jq -r '.version // "0.0.0"')
             
-            log_info "当前版本: v$local_version -> v$remote_version"
-            
-            cp "$temp_dir/menu.sh" "$install_dir/" 2>/dev/null
-            cp "$temp_dir/config.json" "$install_dir/" 2>/dev/null
-            cp "$temp_dir/helper.sh" "$install_dir/" 2>/dev/null
-            
-            chmod +x "$install_dir/menu.sh" 2>/dev/null
-            chmod +x "$install_dir/helper.sh" 2>/dev/null
-            
-            rm -rf "$temp_dir" 2>/dev/null
-            
-            # 重新加载 helper
-            source "$install_dir/helper.sh" 2>/dev/null
-            
-            log_success "更新完成！新版本: v$remote_version"
-            return 0
-        else
-            rm -rf "$temp_dir" 2>/dev/null
-            return 1
+            if version_ge "$remote_version" "$local_version" && [ "$remote_version" != "$local_version" ]; then
+                echo ""
+                echo -e "${COLOR_CYAN}==================== 发现新版本，正在更新 ====================${COLOR_RESET}"
+                
+                local temp_dir="/tmp/server-toolkit-update-$$"
+                mkdir -p "$temp_dir" 2>/dev/null
+                
+                if curl -s -o "$temp_dir/menu.sh" "$RAW_REPO_URL/menu.sh" 2>/dev/null && \
+                   curl -s -o "$temp_dir/config.json" "$RAW_REPO_URL/config.json" 2>/dev/null && \
+                   curl -s -o "$temp_dir/helper.sh" "$RAW_REPO_URL/helper.sh" 2>/dev/null; then
+                    
+                    cp "$temp_dir/menu.sh" "$install_dir/" 2>/dev/null
+                    cp "$temp_dir/config.json" "$install_dir/" 2>/dev/null
+                    cp "$temp_dir/helper.sh" "$install_dir/" 2>/dev/null
+                    
+                    chmod +x "$install_dir/menu.sh" 2>/dev/null
+                    chmod +x "$install_dir/helper.sh" 2>/dev/null
+                    
+                    rm -rf "$temp_dir" 2>/dev/null
+                    updated=true
+                else
+                    rm -rf "$temp_dir" 2>/dev/null
+                fi
+            fi
         fi
     fi
+    
+    if [ "$updated" = "true" ]; then
+        # 重新加载 helper
+        source "$install_dir/helper.sh" 2>/dev/null
+        
+        local new_config=$(cat "$install_dir/config.json" 2>/dev/null || echo "{}")
+        local old_ver=$(echo "$old_config" | jq -r '.version // "0.0.0"')
+        local new_ver=$(echo "$new_config" | jq -r '.version // "0.0.0"')
+        
+        log_success "更新完成！核心版本: v$old_ver -> v$new_ver"
+        
+        # 比较模块版本
+        echo -e "${COLOR_CYAN}--- 模块更新详情 ---${COLOR_RESET}"
+        local modules_changed=false
+        
+        # 获取所有新模块ID
+        local new_ids=$(echo "$new_config" | jq -r '.modules[].id')
+        
+        for id in $new_ids; do
+            local old_m_ver=$(echo "$old_config" | jq -r --arg id "$id" '.modules[] | select(.id == $id) | .version // "0.0.0"')
+            local new_m_ver=$(echo "$new_config" | jq -r --arg id "$id" '.modules[] | select(.id == $id) | .version // "0.0.0"')
+            local m_name=$(echo "$new_config" | jq -r --arg id "$id" '.modules[] | select(.id == $id) | .name')
+            
+            if [ "$old_m_ver" = "0.0.0" ]; then
+                echo -e "  ${COLOR_GREEN}+ [新增]${COLOR_RESET} $m_name (v$new_m_ver)"
+                modules_changed=true
+            elif [ "$old_m_ver" != "$new_m_ver" ]; then
+                echo -e "  ${COLOR_YELLOW}* [更新]${COLOR_RESET} $m_name: v$old_m_ver -> v$new_m_ver"
+                modules_changed=true
+            fi
+        done
+        
+        if [ "$modules_changed" = "false" ]; then
+            echo "  (无模块版本变更)"
+        fi
+        echo ""
+        return 0
+    fi
+    
+    return 1
 }
 
 # 配置 Vault URL
@@ -328,8 +333,11 @@ show_menu() {
                             status_text="$status_text ${COLOR_YELLOW}[可更新到 v$module_version]${COLOR_RESET}"
                         fi
                     else
-                        status_text=" ${COLOR_YELLOW}[未安装]${COLOR_RESET}"
+                        status_text=" ${COLOR_YELLOW}[未安装]${COLOR_RESET} ${COLOR_BLUE}(v$module_version)${COLOR_RESET}"
                     fi
+                else
+                    # 非持久化模块，显示当前版本
+                    status_text=" ${COLOR_BLUE}(v$module_version)${COLOR_RESET}"
                 fi
                 
                 echo -e "${COLOR_YELLOW}[$id]${COLOR_RESET} $name$status_text"
@@ -491,6 +499,12 @@ main() {
     
     # 如果提供了命令选项，进入非交互模式
     if [ -n "$cmd_choice" ]; then
+        # 自动更新检查
+        log_info "正在检查更新..."
+        if do_self_update; then
+             log_success "更新已应用"
+        fi
+
         local config=$(read_repo_config)
         
         # 如果提供了输入序列，处理并管道传输
