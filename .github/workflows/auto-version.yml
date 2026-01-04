@@ -45,5 +45,5 @@ jobs:
         run: |
           TAG_NAME=${{ steps.update_version.outputs.new_tag }}
           echo "Creating tag: $TAG_NAME"
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
+          git tag $TAG_NAME || echo "Tag already exists locally"
+          git push origin $TAG_NAME || echo "Tag already exists on remote, skipping"
