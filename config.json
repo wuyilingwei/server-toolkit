@@ -1,5 +1,5 @@
 {
-  "version": "1.1.5",
+  "version": "1.1.6",
   "track_files": [
     "deploy.sh",
     "helper.sh",
@@ -19,7 +19,7 @@
       "menu_id": 10,
       "enabled": true,
       "needs_persistence": true,
-      "version": "1.0.0"
+      "version": "1.0.1"
     },
     {
       "id": "cert",
@@ -33,7 +33,7 @@
       "menu_id": 11,
       "enabled": true,
       "needs_persistence": true,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "ssh-auth",
@@ -47,7 +47,7 @@
       "menu_id": 20,
       "enabled": true,
       "needs_persistence": false,
-      "version": "1.0.0"
+      "version": "1.0.1"
     },
     {
       "id": "system-swap",
@@ -61,7 +61,7 @@
       "menu_id": 21,
       "enabled": true,
       "needs_persistence": false,
-      "version": "1.0.0"
+      "version": "1.0.1"
     },
     {
       "id": "system-max-systemd",
@@ -89,7 +89,7 @@
       "menu_id": 31,
       "enabled": true,
       "needs_persistence": false,
-      "version": "1.0.2"
+      "version": "1.0.3"
     },
     {
       "id": "setup-docker",
