@@ -454,8 +454,9 @@ input_single_char() {
     # 检测是否为交互式终端
     if [ -t 0 ]; then
         # 交互式：读取单字符输入
-        if read -n 1 -r -p "$full_prompt" user_input 2>/dev/null; then
-            echo "" # 换行
+        # 注意：不要屏蔽 stderr，否则用户看不到提示
+        if read -n 1 -r -p "$full_prompt" user_input; then
+            echo "" >&2 # 换行输出到 stderr，避免被捕获
             if [ -n "$user_input" ]; then
                 echo "$user_input"
             elif [ -n "$previous_value" ]; then

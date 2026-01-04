@@ -207,23 +207,34 @@ if [ -z "$prod_available_list" ]; then
     prod_selection=""
 else
     echo ""
+    # Convert current_prod_domains (names) to IDs
+    current_prod_ids=""
     if [ -n "$current_prod_domains" ]; then
-        prod_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "" "$current_prod_domains")
+        IFS=',' read -ra current_domains <<< "$current_prod_domains"
+        for domain in "${current_domains[@]}"; do
+            # Find ID for this domain
+            for idx in $(seq 1 $((i-1))); do
+                if [ "${domain_map[$idx]}" = "$domain" ]; then
+                    if [ -n "$current_prod_ids" ]; then
+                        current_prod_ids="$current_prod_ids,$idx"
+                    else
+                        current_prod_ids="$idx"
+                    fi
+                    break
+                fi
+            done
+        done
+    fi
+
+    if [ -n "$current_prod_ids" ]; then
+        prod_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "" "$current_prod_ids")
     else
         prod_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "")
     fi
 fi
 
 PROD_DOMAINS=""
-if [ -z "$prod_selection" ] && [ -n "$current_prod_domains" ]; then
-    # 空选择且有现有配置，保持不变
-    IFS=',' read -ra current_domains <<< "$current_prod_domains"
-    for domain in "${current_domains[@]}"; do
-        PROD_DOMAINS="$PROD_DOMAINS
-$domain"
-    done
-    log_success "保持现有的生产证书配置"
-elif [ "$prod_selection" = "all" ]; then
+if [ "$prod_selection" = "all" ]; then
     # 只选择有生产证书的域名
     for idx in $(seq 1 $((i-1))); do
         if [ "${prod_available[$idx]}" = "true" ]; then
@@ -278,23 +289,34 @@ if [ -z "$cf_available_list" ]; then
     cf_selection=""
 else
     echo ""
+    # Convert current_cf_domains (names) to IDs
+    current_cf_ids=""
     if [ -n "$current_cf_domains" ]; then
-        cf_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "" "$current_cf_domains")
+        IFS=',' read -ra current_domains <<< "$current_cf_domains"
+        for domain in "${current_domains[@]}"; do
+            # Find ID for this domain
+            for idx in $(seq 1 $((i-1))); do
+                if [ "${domain_map[$idx]}" = "$domain" ]; then
+                    if [ -n "$current_cf_ids" ]; then
+                        current_cf_ids="$current_cf_ids,$idx"
+                    else
+                        current_cf_ids="$idx"
+                    fi
+                    break
+                fi
+            done
+        done
+    fi
+
+    if [ -n "$current_cf_ids" ]; then
+        cf_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "" "$current_cf_ids")
     else
         cf_selection=$(input_with_enter "请输入要同步的域名编号 (逗号分隔，例如 1,3 或输入 'all' 同步所有)" "")
     fi
 fi
 
 CF_DOMAINS=""
-if [ -z "$cf_selection" ] && [ -n "$current_cf_domains" ]; then
-    # 空选择且有现有配置，保持不变
-    IFS=',' read -ra current_domains <<< "$current_cf_domains"
-    for domain in "${current_domains[@]}"; do
-        CF_DOMAINS="$CF_DOMAINS
-$domain"
-    done
-    log_success "保持现有的源站证书配置"
-elif [ "$cf_selection" = "all" ]; then
+if [ "$cf_selection" = "all" ]; then
     # 只选择有源站证书的域名
     for idx in $(seq 1 $((i-1))); do
         if [ "${cf_available[$idx]}" = "true" ]; then
