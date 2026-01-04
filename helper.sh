@@ -1,10 +1,11 @@
 #!/bin/bash
 # Server Toolkit Helper Functions
-# Version: 1.1.0
+# Version: 1.1.1
 
-CONFIG_VERSION="1.1.0"
+CONFIG_VERSION="1.1.1"
 TOOLKIT_REPO="https://github.com/wuyilingwei/server-toolkit"
-RAW_REPO_URL="https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main"
+# 延迟到 get_config_value 定义后读取
+# UPDATE_BRANCH="main" 
 DEFAULT_INSTALL_DIR="/srv/server-toolkit"
 
 # ANSI Color Codes
@@ -85,6 +86,11 @@ get_remote_repo() {
     get_config_value "SYS_TOOLKIT_REPO" "$TOOLKIT_REPO"
 }
 
+# 获取更新分支
+get_update_branch() {
+    get_config_value "SYS_UPDATE_BRANCH" "main"
+}
+
 # 获取公网 IPv4
 get_public_ipv4() {
     local ipv4=$(curl -4 -s -m 5 https://api.ipify.org 2>/dev/null)
@@ -119,6 +125,25 @@ get_storage_info() {
     local disk_used=$(echo $disk_info | awk '{print $3}')
     local disk_percent=$(echo $disk_info | awk '{print $5}')
     echo "$disk_used / $disk_total ($disk_percent)"
+}
+
+# 获取 CPU 使用率
+get_cpu_usage() {
+    # 读取 /proc/stat
+    read cpu a b c idle rest < /proc/stat
+    local total=$((a+b+c+idle))
+    sleep 0.1
+    read cpu a2 b2 c2 idle2 rest < /proc/stat
+    local total2=$((a2+b2+c2+idle2))
+    local diff_idle=$((idle2-idle))
+    local diff_total=$((total2-total))
+    
+    if [ "$diff_total" -eq 0 ]; then
+        echo "0%"
+    else
+        local usage=$(( (100 * (diff_total - diff_idle)) / diff_total ))
+        echo "${usage}%"
+    fi
 }
 
 # 获取 Swap 使用情况
@@ -270,6 +295,7 @@ show_system_info() {
     echo ""
     
     echo -e "${COLOR_GREEN}[系统资源]${COLOR_RESET}"
+    echo -e "  CPU 使用: $(get_cpu_usage)"
     echo -e "  内存使用: $(get_memory_info)"
     echo -e "  Swap 使用: $(get_swap_info)"
     echo -e "  存储使用: $(get_storage_info)"
@@ -280,6 +306,8 @@ show_system_info() {
     echo -e "  Vault URL: $(get_vault_url)"
     echo -e "  安装目录: $(get_install_dir)"
     echo -e "  配置版本: v${CONFIG_VERSION}"
+    echo -e "  脚本更新源: $(get_remote_repo)"
+    echo -e "  脚本更新分支: $(get_update_branch)"
     echo ""
 }
 

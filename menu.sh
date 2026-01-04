@@ -209,7 +209,45 @@ configure_device_uuid() {
     fi
 }
 
+# 配置脚本更新源
+configure_update_source() {
+    echo ""
+    echo -e "${COLOR_CYAN}==================== 配置脚本更新源 ====================${COLOR_RESET}"
+    echo ""
+    echo "当前更新源: $(get_remote_repo)"
+    echo ""
+    echo -n "请输入新的更新源 URL: "
+    read new_repo
+    
+    if [ -n "$new_repo" ]; then
+        set_config_value "SYS_TOOLKIT_REPO" "$new_repo"
+        # 重新加载环境变量
+        . /etc/environment 2>/dev/null || true
+        log_success "脚本更新源已更新"
+    else
+        log_warning "未输入新 URL，保持原设置"
+    fi
+}
 
+# 配置脚本更新分支
+configure_update_branch() {
+    echo ""
+    echo -e "${COLOR_CYAN}==================== 配置脚本更新分支 ====================${COLOR_RESET}"
+    echo ""
+    echo "当前更新分支: $(get_update_branch)"
+    echo ""
+    echo -n "请输入新的更新分支: "
+    read new_branch
+    
+    if [ -n "$new_branch" ]; then
+        set_config_value "SYS_UPDATE_BRANCH" "$new_branch"
+        # 重新加载环境变量
+        . /etc/environment 2>/dev/null || true
+        log_success "脚本更新分支已更新"
+    else
+        log_warning "未输入新分支，保持原设置"
+    fi
+}
 
 # 显示当前配置
 show_current_config() {
@@ -298,11 +336,11 @@ show_menu() {
     local config="$1"
     local current_version=$(echo "$config" | jq -r '.version // "1.0.0"')
     local current_hash=$(get_current_hash)
-
+    
     echo -e "${COLOR_CYAN}==================== 操作菜单 ====================${COLOR_RESET}"
     echo -e "${COLOR_BLUE}当前版本: v$current_version ($current_hash)${COLOR_RESET}"
     echo ""
-
+    
     # 保留操作 (1-9)
     echo -e "${COLOR_YELLOW}[1]${COLOR_RESET} 系统详细信息"
     echo -e "${COLOR_YELLOW}[2]${COLOR_RESET} 工具包自更新"
@@ -311,12 +349,12 @@ show_menu() {
     echo -e "${COLOR_YELLOW}[5]${COLOR_RESET} 配置设备 UUID"
     echo -e "${COLOR_YELLOW}[6]${COLOR_RESET} 脚本更新源"
     echo -e "${COLOR_YELLOW}[7]${COLOR_RESET} 脚本更新分支"
-
+    
     echo ""
-
+    
     # 模块操作 (10+)
     local modules=$(echo "$config" | jq -c '.modules[]?' 2>/dev/null)
-
+    
     if [ -n "$modules" ]; then
         echo "$modules" | while IFS= read -r module; do
             local id=$(echo "$module" | jq -r '.menu_id')
@@ -325,17 +363,17 @@ show_menu() {
             local module_id=$(echo "$module" | jq -r '.id')
             local module_version=$(echo "$module" | jq -r '.version // "1.0.0"')
             local needs_persistence=$(echo "$module" | jq -r '.needs_persistence // false')
-
+            
             if [ "$enabled" = "true" ]; then
                 local status_text=""
-
+                
                 # 检查是否需要持久化
                 if [ "$needs_persistence" = "true" ]; then
                     local installed_version=$(get_installed_version "$module_id")
-
+                    
                     if [ "$installed_version" != "未安装" ]; then
                         status_text=" ${COLOR_GREEN}[已安装 v$installed_version]${COLOR_RESET}"
-
+                        
                         # 检查是否有更新
                         if [ "$installed_version" != "$module_version" ]; then
                             status_text="$status_text ${COLOR_YELLOW}[可更新到 v$module_version]${COLOR_RESET}"
@@ -347,12 +385,12 @@ show_menu() {
                     # 非持久化模块，显示当前版本
                     status_text=" ${COLOR_BLUE}(v$module_version)${COLOR_RESET}"
                 fi
-
+                
                 echo -e "${COLOR_YELLOW}[$id]${COLOR_RESET} $name$status_text"
             fi
         done
     fi
-
+    
     echo ""
     echo -e "${COLOR_YELLOW}[0]${COLOR_RESET} 退出"
     echo -e "${COLOR_CYAN}==================================================${COLOR_RESET}"
@@ -372,14 +410,10 @@ run_menu_action() {
     # 处理保留操作 (1-9)
     case "$choice" in
         1)
-            configure_vault_url
-            return $?
+            show_system_info
+            return 0
             ;;
         2)
-            configure_device_uuid
-            return $?
-            ;;
-        3)
             echo ""
             echo -e "${COLOR_CYAN}==================== 手动更新 ====================${COLOR_RESET}"
             if do_self_update; then
@@ -390,11 +424,27 @@ run_menu_action() {
                 return 1
             fi
             ;;
-        4)
+        3)
             show_current_config
             return 0
             ;;
-        5|6|7|8|9)
+        4)
+            configure_vault_url
+            return $?
+            ;;
+        5)
+            configure_device_uuid
+            return $?
+            ;;
+        6)
+            configure_update_source
+            return $?
+            ;;
+        7)
+            configure_update_branch
+            return $?
+            ;;
+        8|9)
             log_warning "此功能保留待用"
             return 0
             ;;
