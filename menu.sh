@@ -502,6 +502,11 @@ main() {
             run_menu_action "$cmd_choice" "$config"
         fi
         exit $?
+    elif [ -n "$input_seq" ]; then
+        echo -e "${COLOR_YELLOW}警告: 检测到 -i 参数 (输入序列) 但未指定 -c 参数 (菜单选项)。${COLOR_RESET}"
+        echo "用法示例: server-toolkit -c \"31\" -i \"y|n\""
+        echo "正在进入交互模式..."
+        sleep 2
     fi
     
     # 显示系统信息
