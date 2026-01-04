@@ -76,7 +76,7 @@ echo "Create unified error page snippet..."
 sudo mkdir -p /etc/nginx/snippets
 cat <<'EOF' | sudo tee /etc/nginx/snippets/error_denied.conf > /dev/null
 # 统一的错误页面定义
-error_page 400 403 404 405 406 410 500 501 502 503 504 /denied.html;
+error_page 400 403 404 405 406 410 429 500 501 502 503 504 /denied.html;
 
 location = /denied.html {
     internal;

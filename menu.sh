@@ -342,6 +342,80 @@ show_menu() {
     echo -e "${COLOR_CYAN}==================================================${COLOR_RESET}"
 }
 
+# 执行菜单动作
+run_menu_action() {
+    local choice="$1"
+    local config="$2"
+    
+    # 验证输入
+    if ! [[ "$choice" =~ ^[0-9]+$ ]]; then
+        log_error "请输入有效的数字"
+        return 1
+    fi
+
+    # 处理保留操作 (1-9)
+    case "$choice" in
+        1)
+            configure_vault_url
+            return $?
+            ;;
+        2)
+            configure_device_uuid
+            return $?
+            ;;
+        3)
+            echo ""
+            echo -e "${COLOR_CYAN}==================== 手动更新 ====================${COLOR_RESET}"
+            if do_self_update; then
+                log_success "手动更新完成！"
+                return 0
+            else
+                log_error "手动更新失败"
+                return 1
+            fi
+            ;;
+        4)
+            show_current_config
+            return 0
+            ;;
+        5|6|7|8|9)
+            log_warning "此功能保留待用"
+            return 0
+            ;;
+    esac
+    
+    # 处理模块操作 (10+)
+    if [ "$choice" -ge 10 ]; then
+        local module=$(echo "$config" | jq -c ".modules[] | select(.menu_id == $choice)" 2>/dev/null)
+        
+        if [ -n "$module" ]; then
+            local script=$(echo "$module" | jq -r '.script')
+            local name=$(echo "$module" | jq -r '.name')
+            local min_config=$(echo "$module" | jq -r '.min_config_version // "1.0.0"')
+            local module_id=$(echo "$module" | jq -r '.id')
+            local module_version=$(echo "$module" | jq -r '.version // "1.0.0"')
+            local needs_persistence=$(echo "$module" | jq -r '.needs_persistence // false')
+            
+            # 检查版本兼容性
+            if ! version_ge "$CONFIG_VERSION" "$min_config"; then
+                log_error "此模块需要配置版本 >= v$min_config"
+                log_info "当前版本: v$CONFIG_VERSION"
+                log_info "请先更新工具包"
+                return 1
+            fi
+            
+            execute_module "$script" "$module_id" "$module_version" "$needs_persistence"
+            return $?
+        else
+            log_error "无效的操作编号: $choice"
+            return 1
+        fi
+    fi
+    
+    log_error "无效的操作编号: $choice"
+    return 1
+}
+
 # 主循环
 main_loop() {
     # 读取配置
@@ -381,67 +455,7 @@ main_loop() {
             exit 0
         fi
         
-        # 验证输入
-        if ! [[ "$choice" =~ ^[0-9]+$ ]]; then
-            log_error "请输入有效的数字"
-            continue
-        fi
-        
-        # 处理保留操作 (1-9)
-        case "$choice" in
-            1)
-                configure_vault_url
-                ;;
-            2)
-                configure_device_uuid
-                ;;
-            3)
-                echo ""
-                echo -e "${COLOR_CYAN}==================== 手动更新 ====================${COLOR_RESET}"
-                if do_self_update; then
-                    log_success "手动更新完成！"
-                    # 重新加载配置以防菜单发生变化
-                    config=$(read_repo_config)
-                else
-                    log_error "手动更新失败"
-                fi
-                ;;
-            4)
-                show_current_config
-                ;;
-            5|6|7|8|9)
-                log_warning "此功能保留待用"
-                ;;
-            *)
-                # 处理模块操作 (10+)
-                if [ "$choice" -ge 10 ]; then
-                    local module=$(echo "$config" | jq -c ".modules[] | select(.menu_id == $choice)" 2>/dev/null)
-                    
-                    if [ -n "$module" ]; then
-                        local script=$(echo "$module" | jq -r '.script')
-                        local name=$(echo "$module" | jq -r '.name')
-                        local min_config=$(echo "$module" | jq -r '.min_config_version // "1.0.0"')
-                        local module_id=$(echo "$module" | jq -r '.id')
-                        local module_version=$(echo "$module" | jq -r '.version // "1.0.0"')
-                        local needs_persistence=$(echo "$module" | jq -r '.needs_persistence // false')
-                        
-                        # 检查版本兼容性
-                        if ! version_ge "$CONFIG_VERSION" "$min_config"; then
-                            log_error "此模块需要配置版本 >= v$min_config"
-                            log_info "当前版本: v$CONFIG_VERSION"
-                            log_info "请先更新工具包"
-                            continue
-                        fi
-                        
-                        execute_module "$script" "$module_id" "$module_version" "$needs_persistence"
-                    else
-                        log_error "无效的操作编号"
-                    fi
-                else
-                    log_error "无效的操作编号"
-                fi
-                ;;
-        esac
+        run_menu_action "$choice" "$config"
         
         # 询问是否继续
         echo ""
@@ -458,9 +472,36 @@ main_loop() {
 
 # 主函数
 main() {
+    # 解析参数
+    local cmd_choice=""
+    local input_seq=""
+    
+    while getopts "c:i:" opt; do
+        case $opt in
+            c) cmd_choice="$OPTARG" ;;
+            i) input_seq="$OPTARG" ;;
+            *) ;;
+        esac
+    done
+
     # 检查依赖
     if ! check_dependencies; then
         exit 1
+    fi
+    
+    # 如果提供了命令选项，进入非交互模式
+    if [ -n "$cmd_choice" ]; then
+        local config=$(read_repo_config)
+        
+        # 如果提供了输入序列，处理并管道传输
+        if [ -n "$input_seq" ]; then
+            # 将 | 替换为换行符
+            local formatted_input=$(echo "$input_seq" | tr '|' '\n')
+            echo -e "$formatted_input" | run_menu_action "$cmd_choice" "$config"
+        else
+            run_menu_action "$cmd_choice" "$config"
+        fi
+        exit $?
     fi
     
     # 显示系统信息
