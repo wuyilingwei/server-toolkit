@@ -5,9 +5,9 @@
 source /etc/environment
 VAULT_URL="${SYS_VAULT_URL}"
 TOKEN="${SYS_DEVICE_UUID}"
-LOG_FILE="/srv/server-toolkit/cert/sync.log"
-CONFIG_FILE="/srv/server-toolkit/cert/sync-config.json"
-CERT_DIR="/srv/server-toolkit/cert/local"
+LOG_FILE="/srv/server-toolkit/storage/cert/sync.log"
+CONFIG_FILE="/srv/server-toolkit/storage/cert/sync-config.json"
+CERT_DIR="/srv/server-toolkit/storage/cert/local"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"

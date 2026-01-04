@@ -16,7 +16,7 @@ fi
 
 # Default Configuration
 # Storage directory for persistent data
-STORAGE_DIR="$WORKDIR/cert"
+STORAGE_DIR="$WORKDIR/storage/cert"
 CERT_LOCAL_DIR="$STORAGE_DIR/local"
 CONFIG_FILE="$STORAGE_DIR/sync-config.json"
 mkdir -p "$STORAGE_DIR"
@@ -503,6 +503,11 @@ fi
 
 # Copy worker template to storage directory
 cp "$WORKER_TEMPLATE" "$SYNC_SCRIPT_PATH"
+
+# Update paths in worker script
+sed -i "s|LOG_FILE=.*|LOG_FILE=\"$LOG_FILE\"|g" "$SYNC_SCRIPT_PATH"
+sed -i "s|CONFIG_FILE=.*|CONFIG_FILE=\"$CONFIG_FILE\"|g" "$SYNC_SCRIPT_PATH"
+sed -i "s|CERT_DIR=.*|CERT_DIR=\"$CERT_LOCAL_DIR\"|g" "$SYNC_SCRIPT_PATH"
 
 chmod +x "$SYNC_SCRIPT_PATH"
 
