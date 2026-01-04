@@ -117,12 +117,13 @@ def main():
         print("Updated config.json")
     
     # Output for GitHub Actions
-    if new_tag:
-        # Write to GITHUB_OUTPUT
-        if 'GITHUB_OUTPUT' in os.environ:
-            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+    if 'GITHUB_OUTPUT' in os.environ:
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            if new_tag:
                 f.write(f"new_tag=v{new_tag}\n")
-                f.write(f"config_changed={str(config_changed).lower()}\n")
+            f.write(f"config_changed={str(config_changed).lower()}\n")
+    
+    if new_tag:
         print(f"NEW_TAG: v{new_tag}")
 
 if __name__ == "__main__":
