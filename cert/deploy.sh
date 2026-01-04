@@ -50,6 +50,7 @@ if [ -z "$SYS_DEVICE_UUID" ]; then
     
     if [ -n "$user_token" ]; then
         # Persist to /etc/environment
+        # set_config_value also exports the variable to current environment
         set_config_value "SYS_DEVICE_UUID" "$user_token"
         log_success "UUID 已保存"
     else

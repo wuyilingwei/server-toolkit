@@ -510,10 +510,11 @@ cron_add() {
         return 1
     fi
     
-    # 构建标识符标签
+    # 构建标识符标签（作为 cron 行尾注释，用于标识和移除）
     local tag="#server-toolkit-${identifier}"
     
-    # 构建完整的 cron 命令 (自动添加环境变量加载)
+    # 构建完整的 cron 命令 (自动添加环境变量加载和标签注释)
+    # 格式: time_expr . /etc/environment; command #tag
     local full_cmd="${time_expr} . /etc/environment; ${command} ${tag}"
     
     # 移除旧的任务
