@@ -1,5 +1,5 @@
 {
-  "version": "1.1.1",
+  "version": "1.1.2",
   "track_files": [
     "deploy.sh",
     "helper.sh",
@@ -89,7 +89,7 @@
       "menu_id": 31,
       "enabled": true,
       "needs_persistence": false,
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "id": "setup-docker",
