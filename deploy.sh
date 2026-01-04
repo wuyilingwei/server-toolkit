@@ -217,53 +217,10 @@ set_config_value "SYS_TOOLKIT_DIR" "$INSTALL_DIR"
 # 远程仓库
 set_config_value "SYS_TOOLKIT_REPO" "https://github.com/wuyilingwei/server-toolkit"
 
-# Vault URL
-log_info "配置 Vault URL"
-current_vault_url=$(get_vault_url)
-log_info "当前 Vault URL: $current_vault_url"
-
-if [ "$current_vault_url" != "未配置" ]; then
-    log_success "Vault URL 已配置为: $current_vault_url，跳过配置"
-else
-    echo -n "请输入 Vault URL: "
-    read custom_url
-
-    if [ -n "$custom_url" ]; then
-        set_config_value "SYS_VAULT_URL" "$custom_url"
-    else
-        log_error "未输入 Vault URL，部署中止"
-        exit 1
-    fi
-    log_success "Vault URL 已设置: $(get_vault_url)"
-fi
-
-# 设备 UUID（如果未设置）
-if [ "$(get_device_uuid)" = "未配置" ]; then
-    echo ""
-    log_info "配置设备 UUID"
-    echo -n "请输入设备 UUID (用于 Vault 认证): "
-    read device_uuid
-    echo ""
-    
-    if [ -n "$device_uuid" ]; then
-        set_config_value "SYS_DEVICE_UUID" "$device_uuid"
-        log_success "设备 UUID 已设置"
-    else
-        log_warning "未设置设备 UUID，部分功能可能无法使用"
-    fi
-fi
-
 echo ""
 echo -e "${COLOR_GREEN}==================================================${COLOR_RESET}"
 echo -e "${COLOR_GREEN}              部署完成！${COLOR_RESET}"
 echo -e "${COLOR_GREEN}==================================================${COLOR_RESET}"
-echo ""
-echo "安装目录: $INSTALL_DIR"
-echo "  ├── menu.sh         (主菜单程序)"
-echo "  ├── config.json     (配置文件)"
-echo "  ├── helper.sh       (辅助函数)"
-echo "  ├── scripts/        (Git 仓库目录)"
-echo "  └── storage/        (持久化数据目录)"
 echo ""
 echo "使用以下命令启动工具包菜单："
 echo -e "  ${COLOR_CYAN}server-toolkit${COLOR_RESET}"
