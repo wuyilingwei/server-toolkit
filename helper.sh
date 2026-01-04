@@ -148,26 +148,41 @@ get_cpu_usage() {
 
 # 获取 Swap 使用情况
 get_swap_info() {
-    # 一次性获取 swap 信息（包括数字和人类可读格式）
-    local swap_line_numeric=$(free | grep Swap: 2>/dev/null)
+    # 获取原始数据 (KiB)
+    local swap_line_numeric=$(free -k | grep Swap: 2>/dev/null)
     if [ -z "$swap_line_numeric" ]; then
         echo "N/A"
         return
     fi
     
-    local swap_line_human=$(free -h | grep Swap: 2>/dev/null)
-    local swap_total=$(echo "$swap_line_human" | awk '{print $2}')
-    local swap_used=$(echo "$swap_line_human" | awk '{print $3}')
+    local swap_total_k=$(echo "$swap_line_numeric" | awk '{print $2}')
+    local swap_used_k=$(echo "$swap_line_numeric" | awk '{print $3}')
     
     # 检查是否有 Swap
-    if [ "$swap_total" = "0B" ] || [ "$swap_total" = "0" ]; then
+    if [ "$swap_total_k" = "0" ] || [ -z "$swap_total_k" ]; then
         echo "未配置"
         return
     fi
     
-    # 从数字格式计算使用百分比（避免再次调用 free）
-    local swap_percent=$(echo "$swap_line_numeric" | awk '{if($2>0) printf("%.0f", $3/$2 * 100); else print "0"}')
-    echo "$swap_used / $swap_total (${swap_percent}%)"
+    # 计算百分比
+    local swap_percent=$(awk -v u="$swap_used_k" -v t="$swap_total_k" 'BEGIN {printf "%.0f", u/t*100}')
+    
+    # 格式化函数 (保留1位小数，四舍五入)
+    format_size() {
+        local k=$1
+        if [ $k -ge 1048576 ]; then
+            awk -v k="$k" 'BEGIN {printf "%.1fGi", k/1048576}'
+        elif [ $k -ge 1024 ]; then
+            awk -v k="$k" 'BEGIN {printf "%.1fMi", k/1024}'
+        else
+            echo "${k}Ki"
+        fi
+    }
+    
+    local swap_total_h=$(format_size "$swap_total_k")
+    local swap_used_h=$(format_size "$swap_used_k")
+    
+    echo "$swap_used_h / $swap_total_h (${swap_percent}%)"
 }
 
 # 版本比较 (返回 0 表示 v1 >= v2)
