@@ -93,10 +93,10 @@ swapon "$SWAPFILE"
 # 4. 持久化配置
 echo "[*] 清理 fstab 中的重复 Swap 配置..."
 # 移除所有关于此 SWAPFILE 的重复项
-sed -i "\|^[^#]*[[:space:]]$SWAPFILE[[:space:]]|d" /etc/fstab
+sed -i "\|^[[:space:]]*$SWAPFILE[[:space:]]|d" /etc/fstab
 
 # 添加一项配置
-if ! grep -qE "^[^#]*[[:space:]]$SWAPFILE[[:space:]]" /etc/fstab 2>/dev/null; then 
+if ! grep -qE "^[[:space:]]*$SWAPFILE[[:space:]]" /etc/fstab 2>/dev/null; then 
     echo "$SWAPFILE none swap sw 0 0" >> /etc/fstab
     echo "[+] 已添加 Swap 配置到 fstab"
 else
