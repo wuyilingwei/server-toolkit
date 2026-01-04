@@ -35,17 +35,22 @@ if [ -f /etc/fstab ]; then
 fi
 
 # 提示覆盖警告
-echo "警告: 即将对 Swap 进行以下操作："
-echo "  - 目标路径: $SWAPFILE"
+existing_size=""
 if [ -f "$SWAPFILE" ]; then
-    existing_size=$(du -h "$SWAPFILE" | cut -f1)
-    echo "  - 现有大小: $existing_size (将被覆盖)"
+    existing_size=$(stat --format="%s" "$SWAPFILE")
+    existing_size=$((existing_size / 1024 / 1024)) # 转换为 MiB
+    echo "  - 现有大小: ${existing_size}M (将被覆盖)"
 fi
+
 echo ""
 
 # 1. 询问交换区大小
 if [ -z "$SIZE" ]; then 
-    SIZE=$(input_with_enter "目标交换区大小(如 8G/512M)" "2G")
+    if [ -n "$existing_size" ]; then
+        SIZE=$(input_with_enter "目标交换区大小(如 8G/512M)" "${existing_size}M")
+    else
+        SIZE=$(input_with_enter "目标交换区大小(如 8G/512M)" "2G")
+    fi
 fi
 
 parse(){ 
