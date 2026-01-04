@@ -72,6 +72,9 @@ check_existing_keys() {
         if [ "$has_ed25519" = true ]; then
             echo "🔑 ED25519 密钥:"
             echo "   私钥: $KEY_DIR/id_ed25519"
+            if [ -f "$KEY_DIR/id_ed25519" ]; then
+                echo "   内容: $(cat "$KEY_DIR/id_ed25519" 2>/dev/null || echo '读取失败')"
+            fi
             echo "   公钥: $KEY_DIR/id_ed25519.pub"
             if [ -f "$KEY_DIR/id_ed25519.pub" ]; then
                 echo "   内容: $(cat "$KEY_DIR/id_ed25519.pub" 2>/dev/null || echo '读取失败')"
