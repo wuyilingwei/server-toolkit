@@ -80,8 +80,17 @@ server {
 
     server_name _;
 
+    # 1. 所有的请求都抛出 403 错误
+    error_page 403 /denied.html;
     location / {
-        return 200 '<!DOCTYPE html>
+    return 403;
+    }
+
+    # 2. 定义 403 错误显示的具体内容
+    location = /denied.html {
+    internal; # 确保外部不能直接访问这个路径
+    add_header Content-Type text/html;
+    return 200 '<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -118,13 +127,12 @@ server {
     <p>If you believe this is an error, please contact the site administrator.</p>
 </body>
 </html>';
-        add_header Content-Type text/html;
     }
 }
 
 server {
-    listen 443 ssl default_server;
-    listen [::]:443 ssl default_server;
+    listen 443 ssl http2 default_server;
+    listen [::]:443 ssl http2 default_server;
 
     server_name _;
 
