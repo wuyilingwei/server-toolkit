@@ -2,6 +2,13 @@
 # Server Toolkit Interactive Menu
 # This is the main interface that runs from /srv/server-toolkit
 
+# 检查root权限
+if [ "$EUID" -ne 0 ]; then
+    echo "错误: 需要root权限执行此脚本"
+    echo "请使用: sudo bash $0"
+    exit 1
+fi
+
 # ===== 工作目录保护（强制要求） =====
 WORKDIR="/srv/server-toolkit"
 # 确保工作目录存在

@@ -1,13 +1,6 @@
 #!/bin/bash
 set -e
 
-# 检查root权限
-if [ "$EUID" -ne 0 ]; then
-    echo "错误: 需要root权限执行此脚本"
-    echo "请使用: sudo bash $0"
-    exit 1
-fi
-
 # 检查系统兼容性
 if ! command -v apt-get >/dev/null 2>&1; then
     echo "错误: 此脚本仅支持基于apt的系统（Ubuntu/Debian）"
