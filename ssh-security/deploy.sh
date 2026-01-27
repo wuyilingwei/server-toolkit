@@ -79,13 +79,66 @@ chmod +x "$WORKER_SCRIPT"
 
 echo -e "${COLOR_GREEN}✓ Worker 脚本已部署到: $WORKER_SCRIPT${COLOR_RESET}"
 
-# 3.5. 设置默认拒绝规则（在白名单同步前先拒绝）
-echo -e "\n${COLOR_BLUE}步骤 3.5: 设置默认拒绝规则${COLOR_RESET}"
+# 3.5. 选择防火墙模式
+echo -e "\n${COLOR_BLUE}步骤 3.5: 选择防火墙模式${COLOR_RESET}"
+echo -e "${COLOR_YELLOW}请选择 IP 白名单策略模式:${COLOR_RESET}"
+echo -e "${COLOR_CYAN}  [1] 宽松模式 (loose)${COLOR_RESET} - 仅限制 SSH 端口 22 到白名单"
+echo -e "${COLOR_CYAN}  [2] 严格模式 (strict)${COLOR_RESET} - 除常用端口(22/80/443)外，所有端口仅允许本机、Docker 和白名单访问"
+echo ""
+
+# 读取用户选择并存储到配置文件
+MODE_CONFIG="$STORAGE_DIR/firewall_mode.conf"
+if [ -f "$MODE_CONFIG" ]; then
+    CURRENT_MODE=$(cat "$MODE_CONFIG")
+    echo -e "${COLOR_YELLOW}当前模式: $CURRENT_MODE${COLOR_RESET}"
+fi
+
+mode_choice=$(input_single_char "请输入选择 (1=宽松, 2=严格)" "1")
+
+if [ "$mode_choice" = "2" ]; then
+    FIREWALL_MODE="strict"
+    echo -e "${COLOR_GREEN}✓ 已选择严格模式${COLOR_RESET}"
+else
+    FIREWALL_MODE="loose"
+    echo -e "${COLOR_GREEN}✓ 已选择宽松模式${COLOR_RESET}"
+fi
+
+# 保存模式到配置文件
+echo "$FIREWALL_MODE" > "$MODE_CONFIG"
+
+# 3.6. 设置默认拒绝规则（在白名单同步前先拒绝）
+echo -e "\n${COLOR_BLUE}步骤 3.6: 设置默认拒绝规则${COLOR_RESET}"
 # 清理旧的 ssh-security 规则
 iptables -S INPUT | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null || true
-# 添加默认拒绝规则（优先级较低，会被白名单规则覆盖）
-iptables -A INPUT -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
-echo -e "${COLOR_GREEN}✓ 默认拒绝规则已设置（仅白名单可访问 SSH）${COLOR_RESET}"
+
+# 根据模式设置规则
+if [ "$FIREWALL_MODE" = "strict" ]; then
+    echo -e "${COLOR_YELLOW}严格模式: 配置全局防火墙规则${COLOR_RESET}"
+    # 严格模式：除了常用端口，其他端口只允许本机、Docker和白名单访问
+    # 注意：这些规则会被 worker.sh 维护和更新
+    
+    # 基础规则：允许已建立的连接
+    iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT -m comment --comment "#ssh-security" 2>/dev/null || true
+    
+    # 允许本机访问
+    iptables -A INPUT -i lo -j ACCEPT -m comment --comment "#ssh-security"
+    
+    # 允许 Docker 网络访问 (172.16.0.0/12)
+    iptables -A INPUT -s 172.16.0.0/12 -j ACCEPT -m comment --comment "#ssh-security"
+    
+    # 允许常用端口从任何来源访问 (22, 80, 443)
+    iptables -A INPUT -p tcp -m multiport --dports 22,80,443 -j ACCEPT -m comment --comment "#ssh-security"
+    
+    # 其他所有端口拒绝（会被白名单规则优先覆盖）
+    iptables -A INPUT -j DROP -m comment --comment "#ssh-security"
+    
+    echo -e "${COLOR_GREEN}✓ 严格模式规则已设置${COLOR_RESET}"
+else
+    echo -e "${COLOR_YELLOW}宽松模式: 仅限制 SSH 端口${COLOR_RESET}"
+    # 宽松模式：只限制 SSH 端口 22
+    iptables -A INPUT -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
+    echo -e "${COLOR_GREEN}✓ 宽松模式规则已设置（仅限制 SSH）${COLOR_RESET}"
+fi
 
 # 4. 管理 Crontab
 echo -e "\n${COLOR_BLUE}步骤 4: 配置定时任务${COLOR_RESET}"
@@ -98,11 +151,23 @@ echo -e "\n${COLOR_BLUE}步骤 5: 执行首次同步${COLOR_RESET}"
 echo -e "\n${COLOR_GREEN}========================================${COLOR_RESET}"
 echo -e "${COLOR_GREEN}         部署完成！层级防护已就绪${COLOR_RESET}"
 echo -e "${COLOR_GREEN}========================================${COLOR_RESET}"
-echo -e "${COLOR_GREEN}层级1: 白名单 IP 放行 (IPSET: vault_global_whitelist)${COLOR_RESET}"
-echo -e "${COLOR_GREEN}层级2: 非白名单 SSH 丢弃 (DROP)${COLOR_RESET}"
-echo -e "${COLOR_YELLOW}熔断: 若 API 异常，层级2 自动失效，确保管理入口可用${COLOR_RESET}"
+echo -e "${COLOR_GREEN}防火墙模式: $FIREWALL_MODE${COLOR_RESET}"
+if [ "$FIREWALL_MODE" = "strict" ]; then
+    echo -e "${COLOR_GREEN}严格模式规则:${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 允许本机 (localhost) 所有访问${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 允许 Docker 网络 (172.16.0.0/12) 所有访问${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 允许任意来源访问常用端口 (22/80/443)${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 白名单 IP 可访问所有端口${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 其他来源访问其他端口: 拒绝${COLOR_RESET}"
+else
+    echo -e "${COLOR_GREEN}宽松模式规则:${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 仅限制 SSH 端口 22 到白名单${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 其他端口遵循系统默认规则${COLOR_RESET}"
+fi
+echo -e "${COLOR_YELLOW}熔断: 若 API 异常，层级防护自动失效，确保管理入口可用${COLOR_RESET}"
 echo -e "Worker 脚本: $WORKER_SCRIPT"
 echo -e "日志文件: $LOG_FILE"
+echo -e "模式配置: $MODE_CONFIG"
 echo -e "${COLOR_GREEN}========================================${COLOR_RESET}"
 
 # 6. 交互式卸载 Fail2ban

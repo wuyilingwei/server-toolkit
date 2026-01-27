@@ -19,9 +19,26 @@ VAULT_URL="${SYS_VAULT_URL}"
 TOKEN="${SYS_DEVICE_UUID}"
 IPSET_NAME="vault_global_whitelist"
 
+# Read firewall mode (default to loose if not set)
+WORKDIR="${SYS_TOOLKIT_DIR:-/srv/server-toolkit}"
+STORAGE_DIR="$WORKDIR/storage/ssh-security"
+MODE_CONFIG="$STORAGE_DIR/firewall_mode.conf"
+
+if [ -f "$MODE_CONFIG" ]; then
+    FIREWALL_MODE=$(cat "$MODE_CONFIG")
+else
+    FIREWALL_MODE="loose"
+fi
+
 # [Security Mechanism] Pre-cleanup any lingering DROP rules to ensure sync period doesn't lock us out
 cleanup_drop() {
-    iptables -S INPUT | grep "dport 22" | grep "DROP" | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null
+    if [ "$FIREWALL_MODE" = "strict" ]; then
+        # 严格模式：清理所有 ssh-security 规则
+        iptables -S INPUT | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null
+    else
+        # 宽松模式：只清理 SSH DROP 规则
+        iptables -S INPUT | grep "dport 22" | grep "DROP" | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null
+    fi
 }
 
 # 1. Get response
@@ -61,10 +78,32 @@ ipset destroy "${IPSET_NAME}_tmp"
 # Clean old rules
 iptables -S INPUT | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null
 
-# Level 1: Top priority whitelist ACCEPT
+# Level 1: Top priority whitelist ACCEPT (always first)
 iptables -I INPUT 1 -m set --match-set "$IPSET_NAME" src -j ACCEPT -m comment --comment "#ssh-security"
 
-# Level 2: Only enable DROP when we have confirmed whitelist IPs
-iptables -I INPUT 2 -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
-
-echo "[$(date)] 同步成功。有效 IP 数量: $(echo "$IPS" | wc -l)"
+# Level 2+: Apply rules based on firewall mode
+if [ "$FIREWALL_MODE" = "strict" ]; then
+    # 严格模式：全局防火墙规则
+    # 允许已建立的连接
+    iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT -m comment --comment "#ssh-security" 2>/dev/null || true
+    
+    # 允许本机访问
+    iptables -A INPUT -i lo -j ACCEPT -m comment --comment "#ssh-security"
+    
+    # 允许 Docker 网络访问 (172.16.0.0/12)
+    iptables -A INPUT -s 172.16.0.0/12 -j ACCEPT -m comment --comment "#ssh-security"
+    
+    # 允许常用端口从任何来源访问 (22, 80, 443)
+    iptables -A INPUT -p tcp -m multiport --dports 22,80,443 -j ACCEPT -m comment --comment "#ssh-security"
+    
+    # 其他所有端口拒绝（白名单已在最前面放行）
+    iptables -A INPUT -j DROP -m comment --comment "#ssh-security"
+    
+    echo "[$(date)] 同步成功 (严格模式)。有效白名单 IP 数量: $(echo "$IPS" | wc -l)"
+else
+    # 宽松模式：仅限制 SSH 端口
+    # Level 2: Only enable DROP for SSH port 22
+    iptables -I INPUT 2 -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
+    
+    echo "[$(date)] 同步成功 (宽松模式)。有效白名单 IP 数量: $(echo "$IPS" | wc -l)"
+fi
