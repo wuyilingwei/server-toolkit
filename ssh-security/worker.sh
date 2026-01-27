@@ -36,13 +36,8 @@ fi
 
 # [Security Mechanism] Pre-cleanup any lingering DROP rules to ensure sync period doesn't lock us out
 cleanup_drop() {
-    if [ "$FIREWALL_MODE" = "strict" ]; then
-        # 严格模式：清理所有 ssh-security 规则
-        iptables -S INPUT | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null
-    else
-        # 宽松模式：只清理 SSH DROP 规则
-        iptables -S INPUT | grep "dport 22" | grep "DROP" | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null
-    fi
+    # 清理所有 ssh-security 规则（避免遗留规则）
+    iptables -S INPUT | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null
 }
 
 # 1. Get response
@@ -88,7 +83,7 @@ iptables -I INPUT 1 -m set --match-set "$IPSET_NAME" src -j ACCEPT -m comment --
 # Level 2+: Apply rules based on firewall mode
 if [ "$FIREWALL_MODE" = "strict" ]; then
     # 严格模式：全局防火墙规则
-    # 允许已建立的连接
+    # 允许已建立的连接（系统可能已有此规则，但显式添加确保一致性）
     iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT -m comment --comment "#ssh-security" 2>/dev/null || true
     
     # 允许本机访问
@@ -97,8 +92,11 @@ if [ "$FIREWALL_MODE" = "strict" ]; then
     # 允许 Docker 网络访问
     iptables -A INPUT -s "$DOCKER_NETWORK_CIDR" -j ACCEPT -m comment --comment "#ssh-security"
     
-    # 允许常用端口从任何来源访问
-    iptables -A INPUT -p tcp -m multiport --dports "$COMMON_PORTS" -j ACCEPT -m comment --comment "#ssh-security"
+    # 严格模式: 仅允许 HTTP/HTTPS 从任何来源访问，SSH(22) 仅限白名单
+    iptables -A INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT -m comment --comment "#ssh-security"
+    
+    # SSH 端口 22 拒绝（白名单已在最前面放行）
+    iptables -A INPUT -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
     
     # 其他所有端口拒绝（白名单已在最前面放行）
     iptables -A INPUT -j DROP -m comment --comment "#ssh-security"

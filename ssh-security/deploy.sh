@@ -87,7 +87,7 @@ echo -e "${COLOR_GREEN}✓ Worker 脚本已部署到: $WORKER_SCRIPT${COLOR_RESE
 echo -e "\n${COLOR_BLUE}步骤 3.5: 选择防火墙模式${COLOR_RESET}"
 echo -e "${COLOR_YELLOW}请选择 IP 白名单策略模式:${COLOR_RESET}"
 echo -e "${COLOR_CYAN}  [1] 宽松模式 (loose)${COLOR_RESET} - 仅限制 SSH 端口 22 到白名单"
-echo -e "${COLOR_CYAN}  [2] 严格模式 (strict)${COLOR_RESET} - 除常用端口($COMMON_PORTS)外，所有端口仅允许本机、Docker 和白名单访问"
+echo -e "${COLOR_CYAN}  [2] 严格模式 (strict)${COLOR_RESET} - SSH 仅限白名单，HTTP/HTTPS 公开，其他端口仅限本机/Docker/白名单"
 echo ""
 
 # 读取用户选择并存储到配置文件
@@ -118,10 +118,10 @@ iptables -S INPUT | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev
 # 根据模式设置规则
 if [ "$FIREWALL_MODE" = "strict" ]; then
     echo -e "${COLOR_YELLOW}严格模式: 配置全局防火墙规则${COLOR_RESET}"
-    # 严格模式：除了常用端口，其他端口只允许本机、Docker和白名单访问
+    # 严格模式：SSH 仅限白名单，HTTP/HTTPS 公开，其他端口仅限本机、Docker和白名单
     # 注意：这些规则会被 worker.sh 维护和更新
     
-    # 基础规则：允许已建立的连接
+    # 基础规则：允许已建立的连接（系统可能已有此规则，但显式添加确保一致性）
     iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT -m comment --comment "#ssh-security" 2>/dev/null || true
     
     # 允许本机访问
@@ -130,8 +130,11 @@ if [ "$FIREWALL_MODE" = "strict" ]; then
     # 允许 Docker 网络访问
     iptables -A INPUT -s "$DOCKER_NETWORK_CIDR" -j ACCEPT -m comment --comment "#ssh-security"
     
-    # 允许常用端口从任何来源访问
-    iptables -A INPUT -p tcp -m multiport --dports "$COMMON_PORTS" -j ACCEPT -m comment --comment "#ssh-security"
+    # 严格模式: 仅允许 HTTP/HTTPS 从任何来源访问，SSH(22) 仅限白名单
+    iptables -A INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT -m comment --comment "#ssh-security"
+    
+    # SSH 端口 22 拒绝（会被白名单规则优先覆盖）
+    iptables -A INPUT -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
     
     # 其他所有端口拒绝（会被白名单规则优先覆盖）
     iptables -A INPUT -j DROP -m comment --comment "#ssh-security"
@@ -158,15 +161,17 @@ echo -e "${COLOR_GREEN}========================================${COLOR_RESET}"
 echo -e "${COLOR_GREEN}防火墙模式: $FIREWALL_MODE${COLOR_RESET}"
 if [ "$FIREWALL_MODE" = "strict" ]; then
     echo -e "${COLOR_GREEN}严格模式规则:${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}  • 允许本机 (localhost) 所有访问${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}  • 允许 Docker 网络 ($DOCKER_NETWORK_CIDR) 所有访问${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}  • 允许任意来源访问常用端口 ($COMMON_PORTS)${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}  • 白名单 IP 可访问所有端口${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}  • 其他来源访问其他端口: 拒绝${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 白名单 IP: 可访问所有端口 (最高优先级)${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 本机 (localhost): 可访问所有端口${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • Docker 网络 ($DOCKER_NETWORK_CIDR): 可访问所有端口${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • HTTP/HTTPS (80/443): 任意来源可访问${COLOR_RESET}"
+    echo -e "${COLOR_RED}  • SSH (22): 仅限白名单 ⚠️${COLOR_RESET}"
+    echo -e "${COLOR_RED}  • 其他端口: 拒绝 ⚠️${COLOR_RESET}"
 else
     echo -e "${COLOR_GREEN}宽松模式规则:${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}  • 仅限制 SSH 端口 22 到白名单${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}  • 其他端口遵循系统默认规则${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 白名单 IP: 可访问所有端口${COLOR_RESET}"
+    echo -e "${COLOR_RED}  • SSH 端口 22: 仅限白名单 ⚠️${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 其他端口: 遵循系统默认规则${COLOR_RESET}"
 fi
 echo -e "${COLOR_YELLOW}熔断: 若 API 异常，层级防护自动失效，确保管理入口可用${COLOR_RESET}"
 echo -e "Worker 脚本: $WORKER_SCRIPT"
