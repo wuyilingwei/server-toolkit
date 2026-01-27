@@ -8,18 +8,19 @@
   "min_config_version": "1.0.0",
   "modules": [
     {
-      "id": "ssh-security",
-      "name": "SSH 安全防护部署",
-      "description": "基于 Vault 白名单的 SSH 安全防护系统",
-      "script": "ssh-security/deploy.sh",
+      "id": "firewall-whitelist",
+      "name": "防火墙白名单部署",
+      "description": "基于 Vault 白名单的防火墙安全防护系统（SSH + 全端口保护）",
+      "script": "firewall-whitelist/deploy.sh",
       "track_files": [
-        "ssh-security/**"
+        "firewall-whitelist/**"
       ],
       "min_config_version": "1.0.0",
       "menu_id": 10,
       "enabled": true,
       "needs_persistence": true,
-      "version": "1.0.1"
+      "version": "1.1.0",
+      "legacy_id": "ssh-security"
     },
     {
       "id": "cert",
