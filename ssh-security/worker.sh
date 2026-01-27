@@ -4,6 +4,10 @@
 
 . /etc/environment
 
+# Configuration constants
+DOCKER_NETWORK_CIDR="172.16.0.0/12"
+COMMON_PORTS="22,80,443"
+
 # Check configuration
 if [ -z "$SYS_VAULT_URL" ]; then
     echo "[$(date)] 错误: SYS_VAULT_URL 未配置。请运行 deploy.sh 进行初始化配置。"
@@ -90,11 +94,11 @@ if [ "$FIREWALL_MODE" = "strict" ]; then
     # 允许本机访问
     iptables -A INPUT -i lo -j ACCEPT -m comment --comment "#ssh-security"
     
-    # 允许 Docker 网络访问 (172.16.0.0/12)
-    iptables -A INPUT -s 172.16.0.0/12 -j ACCEPT -m comment --comment "#ssh-security"
+    # 允许 Docker 网络访问
+    iptables -A INPUT -s "$DOCKER_NETWORK_CIDR" -j ACCEPT -m comment --comment "#ssh-security"
     
-    # 允许常用端口从任何来源访问 (22, 80, 443)
-    iptables -A INPUT -p tcp -m multiport --dports 22,80,443 -j ACCEPT -m comment --comment "#ssh-security"
+    # 允许常用端口从任何来源访问
+    iptables -A INPUT -p tcp -m multiport --dports "$COMMON_PORTS" -j ACCEPT -m comment --comment "#ssh-security"
     
     # 其他所有端口拒绝（白名单已在最前面放行）
     iptables -A INPUT -j DROP -m comment --comment "#ssh-security"

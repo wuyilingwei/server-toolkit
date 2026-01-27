@@ -1,6 +1,10 @@
 #!/bin/bash
 # SSH Security Deployment Script
 
+# Configuration constants
+DOCKER_NETWORK_CIDR="172.16.0.0/12"
+COMMON_PORTS="22,80,443"
+
 # ===== 工作目录保护（强制要求） =====
 WORKDIR="/srv/server-toolkit"
 # 确保工作目录存在
@@ -83,7 +87,7 @@ echo -e "${COLOR_GREEN}✓ Worker 脚本已部署到: $WORKER_SCRIPT${COLOR_RESE
 echo -e "\n${COLOR_BLUE}步骤 3.5: 选择防火墙模式${COLOR_RESET}"
 echo -e "${COLOR_YELLOW}请选择 IP 白名单策略模式:${COLOR_RESET}"
 echo -e "${COLOR_CYAN}  [1] 宽松模式 (loose)${COLOR_RESET} - 仅限制 SSH 端口 22 到白名单"
-echo -e "${COLOR_CYAN}  [2] 严格模式 (strict)${COLOR_RESET} - 除常用端口(22/80/443)外，所有端口仅允许本机、Docker 和白名单访问"
+echo -e "${COLOR_CYAN}  [2] 严格模式 (strict)${COLOR_RESET} - 除常用端口($COMMON_PORTS)外，所有端口仅允许本机、Docker 和白名单访问"
 echo ""
 
 # 读取用户选择并存储到配置文件
@@ -123,11 +127,11 @@ if [ "$FIREWALL_MODE" = "strict" ]; then
     # 允许本机访问
     iptables -A INPUT -i lo -j ACCEPT -m comment --comment "#ssh-security"
     
-    # 允许 Docker 网络访问 (172.16.0.0/12)
-    iptables -A INPUT -s 172.16.0.0/12 -j ACCEPT -m comment --comment "#ssh-security"
+    # 允许 Docker 网络访问
+    iptables -A INPUT -s "$DOCKER_NETWORK_CIDR" -j ACCEPT -m comment --comment "#ssh-security"
     
-    # 允许常用端口从任何来源访问 (22, 80, 443)
-    iptables -A INPUT -p tcp -m multiport --dports 22,80,443 -j ACCEPT -m comment --comment "#ssh-security"
+    # 允许常用端口从任何来源访问
+    iptables -A INPUT -p tcp -m multiport --dports "$COMMON_PORTS" -j ACCEPT -m comment --comment "#ssh-security"
     
     # 其他所有端口拒绝（会被白名单规则优先覆盖）
     iptables -A INPUT -j DROP -m comment --comment "#ssh-security"
@@ -155,8 +159,8 @@ echo -e "${COLOR_GREEN}防火墙模式: $FIREWALL_MODE${COLOR_RESET}"
 if [ "$FIREWALL_MODE" = "strict" ]; then
     echo -e "${COLOR_GREEN}严格模式规则:${COLOR_RESET}"
     echo -e "${COLOR_GREEN}  • 允许本机 (localhost) 所有访问${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}  • 允许 Docker 网络 (172.16.0.0/12) 所有访问${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}  • 允许任意来源访问常用端口 (22/80/443)${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 允许 Docker 网络 ($DOCKER_NETWORK_CIDR) 所有访问${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}  • 允许任意来源访问常用端口 ($COMMON_PORTS)${COLOR_RESET}"
     echo -e "${COLOR_GREEN}  • 白名单 IP 可访问所有端口${COLOR_RESET}"
     echo -e "${COLOR_GREEN}  • 其他来源访问其他端口: 拒绝${COLOR_RESET}"
 else
