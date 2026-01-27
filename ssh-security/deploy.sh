@@ -3,7 +3,8 @@
 
 # Configuration constants
 DOCKER_NETWORK_CIDR="172.16.0.0/12"
-COMMON_PORTS="22,80,443"
+HTTP_PORTS="80,443"  # Publicly accessible web service ports in strict mode
+SSH_PORT="22"        # SSH port, always restricted to whitelist
 
 # ===== 工作目录保护（强制要求） =====
 WORKDIR="/srv/server-toolkit"
@@ -130,11 +131,11 @@ if [ "$FIREWALL_MODE" = "strict" ]; then
     # 允许 Docker 网络访问
     iptables -A INPUT -s "$DOCKER_NETWORK_CIDR" -j ACCEPT -m comment --comment "#ssh-security"
     
-    # 严格模式: 仅允许 HTTP/HTTPS 从任何来源访问，SSH(22) 仅限白名单
-    iptables -A INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT -m comment --comment "#ssh-security"
+    # 严格模式: 仅允许 HTTP/HTTPS 从任何来源访问，SSH 仅限白名单
+    iptables -A INPUT -p tcp -m multiport --dports "$HTTP_PORTS" -j ACCEPT -m comment --comment "#ssh-security"
     
-    # SSH 端口 22 拒绝（会被白名单规则优先覆盖）
-    iptables -A INPUT -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
+    # SSH 端口拒绝（会被白名单规则优先覆盖）
+    iptables -A INPUT -p tcp --dport "$SSH_PORT" -j DROP -m comment --comment "#ssh-security"
     
     # 其他所有端口拒绝（会被白名单规则优先覆盖）
     iptables -A INPUT -j DROP -m comment --comment "#ssh-security"
@@ -142,8 +143,8 @@ if [ "$FIREWALL_MODE" = "strict" ]; then
     echo -e "${COLOR_GREEN}✓ 严格模式规则已设置${COLOR_RESET}"
 else
     echo -e "${COLOR_YELLOW}宽松模式: 仅限制 SSH 端口${COLOR_RESET}"
-    # 宽松模式：只限制 SSH 端口 22
-    iptables -A INPUT -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
+    # 宽松模式：只限制 SSH 端口
+    iptables -A INPUT -p tcp --dport "$SSH_PORT" -j DROP -m comment --comment "#ssh-security"
     echo -e "${COLOR_GREEN}✓ 宽松模式规则已设置（仅限制 SSH）${COLOR_RESET}"
 fi
 

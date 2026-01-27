@@ -6,7 +6,8 @@
 
 # Configuration constants
 DOCKER_NETWORK_CIDR="172.16.0.0/12"
-COMMON_PORTS="22,80,443"
+HTTP_PORTS="80,443"  # Publicly accessible web service ports in strict mode
+SSH_PORT="22"        # SSH port, always restricted to whitelist
 
 # Check configuration
 if [ -z "$SYS_VAULT_URL" ]; then
@@ -92,11 +93,11 @@ if [ "$FIREWALL_MODE" = "strict" ]; then
     # 允许 Docker 网络访问
     iptables -A INPUT -s "$DOCKER_NETWORK_CIDR" -j ACCEPT -m comment --comment "#ssh-security"
     
-    # 严格模式: 仅允许 HTTP/HTTPS 从任何来源访问，SSH(22) 仅限白名单
-    iptables -A INPUT -p tcp -m multiport --dports 80,443 -j ACCEPT -m comment --comment "#ssh-security"
+    # 严格模式: 仅允许 HTTP/HTTPS 从任何来源访问，SSH 仅限白名单
+    iptables -A INPUT -p tcp -m multiport --dports "$HTTP_PORTS" -j ACCEPT -m comment --comment "#ssh-security"
     
-    # SSH 端口 22 拒绝（白名单已在最前面放行）
-    iptables -A INPUT -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
+    # SSH 端口拒绝（白名单已在最前面放行）
+    iptables -A INPUT -p tcp --dport "$SSH_PORT" -j DROP -m comment --comment "#ssh-security"
     
     # 其他所有端口拒绝（白名单已在最前面放行）
     iptables -A INPUT -j DROP -m comment --comment "#ssh-security"
@@ -104,8 +105,8 @@ if [ "$FIREWALL_MODE" = "strict" ]; then
     echo "[$(date)] 同步成功 (严格模式)。有效白名单 IP 数量: $(echo "$IPS" | wc -l)"
 else
     # 宽松模式：仅限制 SSH 端口
-    # Level 2: Only enable DROP for SSH port 22
-    iptables -I INPUT 2 -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
+    # Level 2: Only enable DROP for SSH port
+    iptables -I INPUT 2 -p tcp --dport "$SSH_PORT" -j DROP -m comment --comment "#ssh-security"
     
     echo "[$(date)] 同步成功 (宽松模式)。有效白名单 IP 数量: $(echo "$IPS" | wc -l)"
 fi
