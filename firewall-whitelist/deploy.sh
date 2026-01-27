@@ -1,10 +1,17 @@
 #!/bin/bash
-# SSH Security Deployment Script
+# Firewall Whitelist Deployment Script
+# (Formerly: SSH Security)
 
 # Configuration constants
 DOCKER_NETWORK_CIDR="172.16.0.0/12"
 HTTP_PORTS="80,443"  # Publicly accessible web service ports in strict mode
 SSH_PORT="22"        # SSH port, always restricted to whitelist
+
+# Module identifiers (for backward compatibility)
+MODULE_ID="firewall-whitelist"
+LEGACY_MODULE_ID="ssh-security"
+IPTABLES_TAG="#firewall-whitelist"
+LEGACY_IPTABLES_TAG="#ssh-security"
 
 # ===== 工作目录保护（强制要求） =====
 WORKDIR="/srv/server-toolkit"
@@ -26,12 +33,21 @@ else
     exit 1
 fi
 
-# Storage directory for persistent data
-STORAGE_DIR="$WORKDIR/storage/ssh-security"
+# Storage directory for persistent data (with backward compatibility)
+STORAGE_DIR="$WORKDIR/storage/$MODULE_ID"
+LEGACY_STORAGE_DIR="$WORKDIR/storage/$LEGACY_MODULE_ID"
+
+# Migrate from old storage directory if it exists
+if [ -d "$LEGACY_STORAGE_DIR" ] && [ ! -d "$STORAGE_DIR" ]; then
+    echo -e "${COLOR_YELLOW}检测到旧版本数据目录，正在迁移...${COLOR_RESET}"
+    mv "$LEGACY_STORAGE_DIR" "$STORAGE_DIR"
+    echo -e "${COLOR_GREEN}✓ 数据迁移完成${COLOR_RESET}"
+fi
+
 mkdir -p "$STORAGE_DIR"
 
 echo -e "${COLOR_BLUE}========================================${COLOR_RESET}"
-echo -e "${COLOR_BLUE}      SSH Security 部署脚本${COLOR_RESET}"
+echo -e "${COLOR_BLUE}      防火墙白名单部署脚本${COLOR_RESET}"
 echo -e "${COLOR_BLUE}========================================${COLOR_RESET}"
 
 # 1. 检查环境变量配置状态
@@ -79,7 +95,7 @@ WORKER_SCRIPT="$STORAGE_DIR/worker.sh"
 LOG_FILE="$STORAGE_DIR/sync.log"
 
 # 复制 worker 脚本模板到 storage 目录
-cp "$WORKDIR/scripts/ssh-security/worker.sh" "$WORKER_SCRIPT"
+cp "$WORKDIR/scripts/$MODULE_ID/worker.sh" "$WORKER_SCRIPT"
 chmod +x "$WORKER_SCRIPT"
 
 echo -e "${COLOR_GREEN}✓ Worker 脚本已部署到: $WORKER_SCRIPT${COLOR_RESET}"
@@ -113,8 +129,9 @@ echo "$FIREWALL_MODE" > "$MODE_CONFIG"
 
 # 3.6. 设置默认拒绝规则（在白名单同步前先拒绝）
 echo -e "\n${COLOR_BLUE}步骤 3.6: 设置默认拒绝规则${COLOR_RESET}"
-# 清理旧的 ssh-security 规则
-iptables -S INPUT | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null || true
+# 清理旧的规则（包括旧版本的标签）
+iptables -S INPUT | grep "$LEGACY_IPTABLES_TAG" | sed "s/-A/iptables -D/" | bash 2>/dev/null || true
+iptables -S INPUT | grep "$IPTABLES_TAG" | sed "s/-A/iptables -D/" | bash 2>/dev/null || true
 
 # 根据模式设置规则
 if [ "$FIREWALL_MODE" = "strict" ]; then
@@ -123,34 +140,37 @@ if [ "$FIREWALL_MODE" = "strict" ]; then
     # 注意：这些规则会被 worker.sh 维护和更新
     
     # 基础规则：允许已建立的连接（系统可能已有此规则，但显式添加确保一致性）
-    iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT -m comment --comment "#ssh-security" 2>/dev/null || true
+    iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT -m comment --comment "$IPTABLES_TAG" 2>/dev/null || true
     
     # 允许本机访问
-    iptables -A INPUT -i lo -j ACCEPT -m comment --comment "#ssh-security"
+    iptables -A INPUT -i lo -j ACCEPT -m comment --comment "$IPTABLES_TAG"
     
     # 允许 Docker 网络访问
-    iptables -A INPUT -s "$DOCKER_NETWORK_CIDR" -j ACCEPT -m comment --comment "#ssh-security"
+    iptables -A INPUT -s "$DOCKER_NETWORK_CIDR" -j ACCEPT -m comment --comment "$IPTABLES_TAG"
     
     # 严格模式: 仅允许 HTTP/HTTPS 从任何来源访问，SSH 仅限白名单
-    iptables -A INPUT -p tcp -m multiport --dports "$HTTP_PORTS" -j ACCEPT -m comment --comment "#ssh-security"
+    iptables -A INPUT -p tcp -m multiport --dports "$HTTP_PORTS" -j ACCEPT -m comment --comment "$IPTABLES_TAG"
     
     # SSH 端口拒绝（会被白名单规则优先覆盖）
-    iptables -A INPUT -p tcp --dport "$SSH_PORT" -j DROP -m comment --comment "#ssh-security"
+    iptables -A INPUT -p tcp --dport "$SSH_PORT" -j DROP -m comment --comment "$IPTABLES_TAG"
     
     # 其他所有端口拒绝（会被白名单规则优先覆盖）
-    iptables -A INPUT -j DROP -m comment --comment "#ssh-security"
+    iptables -A INPUT -j DROP -m comment --comment "$IPTABLES_TAG"
     
     echo -e "${COLOR_GREEN}✓ 严格模式规则已设置${COLOR_RESET}"
 else
     echo -e "${COLOR_YELLOW}宽松模式: 仅限制 SSH 端口${COLOR_RESET}"
     # 宽松模式：只限制 SSH 端口
-    iptables -A INPUT -p tcp --dport "$SSH_PORT" -j DROP -m comment --comment "#ssh-security"
+    iptables -A INPUT -p tcp --dport "$SSH_PORT" -j DROP -m comment --comment "$IPTABLES_TAG"
     echo -e "${COLOR_GREEN}✓ 宽松模式规则已设置（仅限制 SSH）${COLOR_RESET}"
 fi
 
 # 4. 管理 Crontab
 echo -e "\n${COLOR_BLUE}步骤 4: 配置定时任务${COLOR_RESET}"
-cron_add "ssh-security" "*/10 * * * *" "/bin/sh $WORKER_SCRIPT >> $LOG_FILE 2>&1"
+# 清理旧的 cron 任务（如果存在）
+cron_remove "$LEGACY_MODULE_ID"
+# 添加新的 cron 任务
+cron_add "$MODULE_ID" "*/10 * * * *" "/bin/sh $WORKER_SCRIPT >> $LOG_FILE 2>&1"
 
 # 5. 立即执行首次同步
 echo -e "\n${COLOR_BLUE}步骤 5: 执行首次同步${COLOR_RESET}"
