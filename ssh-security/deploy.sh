@@ -79,6 +79,14 @@ chmod +x "$WORKER_SCRIPT"
 
 echo -e "${COLOR_GREEN}✓ Worker 脚本已部署到: $WORKER_SCRIPT${COLOR_RESET}"
 
+# 3.5. 设置默认拒绝规则（在白名单同步前先拒绝）
+echo -e "\n${COLOR_BLUE}步骤 3.5: 设置默认拒绝规则${COLOR_RESET}"
+# 清理旧的 ssh-security 规则
+iptables -S INPUT | grep "#ssh-security" | sed "s/-A/iptables -D/" | bash 2>/dev/null || true
+# 添加默认拒绝规则（优先级较低，会被白名单规则覆盖）
+iptables -A INPUT -p tcp --dport 22 -j DROP -m comment --comment "#ssh-security"
+echo -e "${COLOR_GREEN}✓ 默认拒绝规则已设置（仅白名单可访问 SSH）${COLOR_RESET}"
+
 # 4. 管理 Crontab
 echo -e "\n${COLOR_BLUE}步骤 4: 配置定时任务${COLOR_RESET}"
 cron_add "ssh-security" "*/10 * * * *" "/bin/sh $WORKER_SCRIPT >> $LOG_FILE 2>&1"
