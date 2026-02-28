@@ -34,9 +34,33 @@ if systemctl is-active --quiet nginx 2>/dev/null; then
     echo "警告: Nginx 已在运行，将重新配置默认站点"
 fi
 
-echo "🚀 Install nginx..."
+echo "🚀 Install nginx from official nginx.org repository..."
+sudo apt update
+sudo apt install -y curl gnupg2 ca-certificates lsb-release
+
+source /etc/os-release
+DISTRO_ID="${ID,,}"
+if [ "$DISTRO_ID" = "ubuntu" ]; then
+        sudo apt install -y ubuntu-keyring
+        NGINX_REPO_BASE="https://nginx.org/packages/ubuntu"
+elif [ "$DISTRO_ID" = "debian" ]; then
+        sudo apt install -y debian-archive-keyring
+        NGINX_REPO_BASE="https://nginx.org/packages/debian"
+else
+        echo "错误: 官方 nginx 仓库仅支持 Ubuntu/Debian，当前系统: $DISTRO_ID"
+        exit 1
+fi
+
+curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
+    | sudo tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
+
+echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] ${NGINX_REPO_BASE} $(lsb_release -cs) nginx" \
+    | sudo tee /etc/apt/sources.list.d/nginx.list >/dev/null
+
 sudo apt update
 sudo apt install -y nginx
+echo "✅ Installed nginx version:"
+nginx -v 2>&1
 
 echo "📦 Backup existing site configuration..."
 # 创建备份目录

@@ -223,6 +223,21 @@ sudo server-toolkit
 # 选择 [11] 系统更新
 ```
 
+### 3. Nginx 部署安装 [31]
+
+安装并初始化 Nginx，默认使用 nginx.org 官方 APT 源：
+
+- 使用官方签名 key 与仓库
+- 安装最新稳定版 Nginx
+- 自动写入默认拒绝站点与基础安全配置
+
+**使用方法**：
+
+```bash
+sudo server-toolkit
+# 选择 [31] Nginx 部署安装
+```
+
 ## Vault API 集成
 
 ### API 端点

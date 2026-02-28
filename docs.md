@@ -147,6 +147,7 @@ wget -qO- https://raw.githubusercontent.com/wuyilingwei/server-toolkit/main/depl
 | 10   | SSH 安全防护   | 基于 Vault 白名单的 SSH 防护系统 |
 | 11   | 证书同步       | 从 Vault 同步 SSL 证书           |
 | 12   | 系统 Swap 管理 | 创建和调整 Swap 交换区           |
+| 31   | Nginx 部署安装 | 通过 nginx.org 官方源安装最新稳定版 Nginx |
 
 ## 功能模块
 
@@ -215,6 +216,22 @@ sudo server-toolkit
 ```bash
 sudo server-toolkit
 # 选择 [12] 系统 Swap 管理
+```
+
+### Nginx 部署安装模块
+
+**功能特性：**
+
+- 通过 nginx.org 官方 APT 源安装 Nginx
+- 自动配置官方签名 key 与软件源
+- 安装后输出 `nginx -v` 版本信息
+- 自动配置默认拒绝站点与基础安全项
+
+**使用方法：**
+
+```bash
+sudo server-toolkit
+# 选择 [31] Nginx 部署安装
 ```
 
 ## 配置管理

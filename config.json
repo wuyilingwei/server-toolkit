@@ -81,7 +81,7 @@
     {
       "id": "setup-nginx",
       "name": "Nginx 部署安装",
-      "description": "安装 Nginx 网站服务器并配置默认页面",
+      "description": "通过 nginx.org 官方源安装 Nginx 最新稳定版并配置默认页面",
       "script": "setup/nginx.sh",
       "track_files": [
         "setup/nginx.sh"
@@ -90,7 +90,7 @@
       "menu_id": 31,
       "enabled": true,
       "needs_persistence": false,
-      "version": "1.0.3"
+      "version": "1.0.4"
     },
     {
       "id": "setup-docker",
