@@ -90,7 +90,7 @@
       "menu_id": 31,
       "enabled": true,
       "needs_persistence": false,
-      "version": "1.0.4"
+      "version": "1.0.5"
     },
     {
       "id": "setup-docker",
