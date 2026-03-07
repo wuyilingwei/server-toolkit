@@ -109,6 +109,48 @@ else
     echo "✅ 已添加 server_tokens off 到 nginx.conf"
 fi
 
+echo "⚙️  Configure gzip compression settings..."
+# 创建 gzip 配置 snippet
+cat <<'EOF' | sudo tee /etc/nginx/snippets/gzip.conf > /dev/null
+# Gzip 压缩配置
+gzip on;
+
+# 静态资源超过 1k 才压缩，太小的文件压缩后反而可能变大
+gzip_min_length 1024;
+
+# 压缩级别，1-9，建议 5 或 6。再高 CPU 消耗不成比例
+gzip_comp_level 6;
+
+# 明确指定只压缩文本类，排除图片视频
+gzip_types 
+    text/plain 
+    text/css 
+    application/javascript 
+    application/json 
+    application/x-javascript 
+    text/xml 
+    application/xml 
+    application/xml+rss 
+    text/javascript;
+
+# 解决 HTTPS 下的压缩缓存兼容性
+gzip_vary on;
+
+# 针对反向代理环境，必须开启
+gzip_proxied any;
+
+# 禁用老旧浏览器（虽然现在基本没人在用了）
+gzip_disable "MSIE [1-6]\.";
+EOF
+
+# 在 nginx.conf 的 http 块中引入 gzip 配置
+if ! grep -q "include /etc/nginx/snippets/gzip.conf" /etc/nginx/nginx.conf; then
+    sudo sed -i '/server_tokens off;/a\\tinclude /etc/nginx/snippets/gzip.conf;' /etc/nginx/nginx.conf
+    echo "✅ 已启用 gzip 压缩配置"
+else
+    echo "ℹ️  gzip 配置已存在，跳过"
+fi
+
 echo "Create unified error page snippet..."
 sudo mkdir -p /etc/nginx/snippets
 cat <<'EOF' | sudo tee /etc/nginx/snippets/error_denied.conf > /dev/null
